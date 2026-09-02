@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Astro Nifty — Probability Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#080C14; --bg2:#0C111C; --card:#111827; --card2:#161F2E; --card3:#1C2637;
+  --line:#22304A; --line2:#2E3D57;
+  --txt:#E8EDF5; --dim:#94A3B8; --dim2:#64748B;
+  --acc:#3B82F6; --acc2:#60A5FA;
+  --up:#22C55E; --dn:#EF4444; --amb:#F59E0B; --pur:#A855F7; --cy:#06B6D4;
+  --upT:rgba(34,197,94,.13); --dnT:rgba(239,68,68,.12); --ambT:rgba(245,158,11,.13);
+  --accT:rgba(59,130,246,.12); --purT:rgba(168,85,247,.12); --purS:rgba(168,85,247,.42);
+  --hair:rgba(148,163,184,.20); --rowline:rgba(46,61,87,.70); --veil:rgba(0,0,0,.40);
+  --onUp:#052e16; --onDn:#450a0a; --onAmb:#451a03; --onPur:#2e1065; --onCy:#083344;
+  --sbw:212px; --rw:270px;
+}
+:root[data-theme="light"]{
+  --bg:#EEF1F7; --bg2:#FFFFFF; --card:#FFFFFF; --card2:#F3F6FB; --card3:#E5EAF3;
+  --line:#DCE3EE; --line2:#C2CCDC;
+  --txt:#0F1729; --dim:#55607A; --dim2:#8590A6;
+  --acc:#2563EB; --acc2:#1D4ED8;
+  --up:#15803D; --dn:#DC2626; --amb:#B45309; --pur:#7C3AED; --cy:#0E7490;
+  --upT:rgba(21,128,61,.13); --dnT:rgba(220,38,38,.12); --ambT:rgba(180,83,9,.13);
+  --accT:rgba(37,99,235,.12); --purT:rgba(124,58,237,.12); --purS:rgba(124,58,237,.42);
+  --hair:rgba(85,96,122,.2); --rowline:rgba(194,204,220,.7); --veil:rgba(15,23,41,.4);
+  --onUp:#FFFFFF; --onDn:#FFFFFF; --onAmb:#FFFFFF; --onPur:#FFFFFF; --onCy:#FFFFFF;
+}
+:root[data-theme="light"] body{
+  background-image:radial-gradient(ellipse 900px 460px at 50% -12%,#FFFFFF 0%,transparent 72%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,sans-serif;
+  font-size:13px;line-height:1.45;overflow-x:hidden}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button,select,input{font-family:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+
+/* ── shell ── */
+.app{display:flex;min-height:100vh}
+.side{width:var(--sbw);flex:0 0 var(--sbw);background:var(--bg2);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:60;transition:transform .25s}
+.brand{padding:16px 16px 14px;border-bottom:1px solid var(--line)}
+.brand h1{font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.brand h1 i{font-style:normal;color:var(--acc2)}
+.brand p{font-size:9px;letter-spacing:.16em;color:var(--dim2);margin-top:3px;font-weight:600}
+.nav{flex:1;overflow-y:auto;padding:9px 8px}
+.nav button{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:7px;
+  color:var(--dim);font-size:12.5px;font-weight:500;text-align:left;transition:.12s;margin-bottom:1px}
+.nav button:hover{background:var(--card);color:var(--txt)}
+.nav button.on{background:var(--acc);color:#fff;font-weight:600}
+.nav button .ic{width:15px;text-align:center;font-size:13px;flex:0 0 15px}
+.nav .grp{font-size:9px;letter-spacing:.14em;color:var(--dim2);padding:12px 10px 5px;font-weight:700}
+.mstat{border-top:1px solid var(--line);padding:12px 14px;font-size:11px}
+.mstat .t{font-size:9px;letter-spacing:.12em;color:var(--dim2);font-weight:700;margin-bottom:7px}
+.mstat .big{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:2px 0}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}
+
+.main{flex:1;margin-left:var(--sbw);min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line);
+  background:var(--bg2);position:sticky;top:0;z-index:40}
+.top h2{font-size:17px;font-weight:700;letter-spacing:-.02em}
+.top p{font-size:11.5px;color:var(--dim)}
+.top .sp{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);
+  border-radius:7px;padding:6px 11px;font-size:11.5px;color:var(--dim)}
+.btn{background:var(--acc);color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;
+  transition:.15s}
+.btn:hover{background:var(--acc2)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+.btn.ghost:hover{border-color:var(--acc);color:var(--acc2)}
+.btn:focus-visible,.nav button:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hamb{display:none;font-size:19px;color:var(--dim);padding:4px 8px;border-radius:6px}
+.iconbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--card);
+  font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;transition:.15s;
+  filter:grayscale(1) opacity(.62)}
+.iconbtn:hover{border-color:var(--amb);filter:none;transform:translateY(-1px)}
+.iconbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+:root[data-theme="light"] .iconbtn{filter:none}
+.seg{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);
+  border-radius:8px;padding:3px;flex-wrap:wrap}
+.seg .seglbl{font-size:9.5px;letter-spacing:.1em;color:var(--dim2);font-weight:700;padding:0 7px;
+  text-transform:uppercase;white-space:nowrap}
+.seg button{padding:5px 10px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--dim);
+  white-space:nowrap;transition:.13s}
+.seg button:hover{color:var(--txt)}
+.seg button.on{background:var(--acc);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+
+.body{flex:1;display:flex;min-width:0}
+.content{flex:1;padding:14px;min-width:0}
+.rail{width:var(--rw);flex:0 0 var(--rw);padding:14px 14px 14px 0}
+.scrim{display:none;position:fixed;inset:0;background:var(--veil);z-index:55}
+
+/* ── cards ── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  margin-bottom:12px;min-width:0;max-width:100%}
+.card > h3{font-size:11.5px;font-weight:700;letter-spacing:.06em;margin-bottom:2px}
+.card > .sub{font-size:10.5px;color:var(--dim2);margin-bottom:11px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.g23{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.25fr) minmax(0,.95fr);gap:12px}
+.g2b{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:12px}
+/* Grid and flex items default to min-width:auto, so a wide table forces its column
+   wider instead of scrolling — that is what pushed panels over each other. */
+.g2>*,.g3>*,.g23>*,.g2b>*,.split2>*,.cpwrap>*{min-width:0}
+
+/* hero */
+.hero{display:grid;grid-template-columns:auto minmax(0,1fr) repeat(4,minmax(84px,auto));gap:16px;align-items:center;
+  background:linear-gradient(135deg,var(--card2),var(--card));border:1px solid var(--line);
+  border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.hero .orb{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:28px;color:#fff;background:linear-gradient(140deg,#8B5CF6,#EC4899);flex:0 0 60px}
+.hero .lbl{font-size:9px;letter-spacing:.14em;color:var(--amb);font-weight:700;margin-bottom:3px}
+.hero .nm{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.15;
+  overflow-wrap:anywhere;min-width:0}
+.hero>*{min-width:0}
+.hero .sm{font-size:11.5px;color:var(--dim);margin-top:2px}
+.hcell{text-align:center}
+.hcell .k{font-size:9px;letter-spacing:.12em;color:var(--dim2);font-weight:700;margin-bottom:5px}
+.hcell .v{font-size:12.5px;font-weight:600}
+.hcell .vb{font-size:27px;font-weight:700;letter-spacing:-.02em}
+.tag{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.04em}
+
+/* scope strip */
+.scopebar{background:linear-gradient(135deg,var(--card2),var(--card));border:1px solid var(--line);
+  border-radius:10px;padding:11px 13px;margin-bottom:12px;min-width:0}
+.sbhead{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:9px}
+.sbk{font-size:9px;letter-spacing:.14em;color:var(--amb);font-weight:700}
+.sbl{font-size:15px;font-weight:700;letter-spacing:-.01em;line-height:1.2;margin-top:2px;
+  display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;overflow-wrap:anywhere}
+.sbd{font-size:11.5px;color:var(--dim);margin-top:2px}
+.sbchips{display:flex;gap:5px;flex-wrap:wrap}
+.sbchip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:7px;
+  background:var(--card3);border:1px solid var(--line);color:var(--dim);font-size:11.5px;
+  font-weight:500;transition:.13s;max-width:100%}
+.sbchip:hover{border-color:var(--acc);color:var(--txt)}
+.sbchip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.sbchip b{font-weight:700;opacity:.72;font-size:10.5px}
+.sbchip .dot{width:6px;height:6px;margin:0;flex:0 0 6px}
+.sbchip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* bars */
+.brow{display:grid;grid-template-columns:minmax(0,88px) minmax(0,1fr) minmax(42px,auto);
+  gap:9px;align-items:center;margin-bottom:8px;font-size:12px}
+.brow .l{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .p{white-space:nowrap}
+.brow .t{height:15px;background:var(--card3);border-radius:4px;overflow:hidden}
+.brow .t i{display:block;height:100%;border-radius:4px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.brow .p{text-align:right;font-weight:600;font-size:12px}
+.mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:11px}
+.mini .v{overflow-wrap:anywhere}
+.mini > div{background:var(--card2);border:1px solid var(--line);border-radius:7px;padding:8px;text-align:center}
+.mini .k{font-size:9.5px;color:var(--dim2);margin-bottom:3px}
+.mini .v{font-size:15px;font-weight:700}
+
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.split2 .h{font-size:10.5px;color:var(--dim);text-align:center;margin-bottom:9px}
+.dn{display:flex;align-items:center;gap:9px;margin-top:11px}
+.dn .txt .k{font-size:10px;color:var(--dim2)}
+.dn .txt .v{font-size:15px;font-weight:700}
+
+/* stat list */
+.sl{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;
+  border-bottom:1px solid var(--rowline);font-size:12px}
+.sl:last-child{border-bottom:0}
+.sl .k{color:var(--dim)}
+.sl .v{font-weight:600}
+
+/* table */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+  scrollbar-width:thin;overscroll-behavior-x:contain}
+table{width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap}
+th{background:var(--card2);color:var(--dim2);font-size:9.5px;letter-spacing:.08em;font-weight:700;
+  padding:7px 9px;text-align:left;position:sticky;top:0}
+td{padding:6px 9px;border-top:1px solid var(--line)}
+tbody tr:hover{background:var(--card2)}
+.chp{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+
+/* histogram */
+.hist{display:flex;align-items:flex-end;gap:3px;height:118px;padding:6px 0 20px;min-width:0}
+.hist .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
+.hist .b i{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s cubic-bezier(.4,0,.2,1)}
+.hist .b span{font-size:8.5px;color:var(--dim2);white-space:nowrap;transform:rotate(-40deg);
+  transform-origin:top center;height:14px;display:block;line-height:1;pointer-events:none}
+.hist .b{min-width:0}
+.tabs{display:flex;gap:4px;margin-bottom:11px;flex-wrap:wrap}
+.tabs button{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;color:var(--dim);
+  background:var(--card2);border:1px solid var(--line)}
+.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* close position */
+.cpwrap{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px}
+.cpscale{position:relative;background:linear-gradient(to top,var(--upT),var(--accT));border:1px solid var(--line);
+  border-radius:7px;min-height:172px}
+.cpscale .tick{position:absolute;left:0;right:0;border-top:1px dashed var(--hair);
+  font-size:8.5px;color:var(--dim2);padding-left:3px}
+.cpscale .mk{position:absolute;left:50%;width:11px;height:11px;border-radius:50%;background:var(--up);
+  border:2px solid var(--card);transform:translate(-50%,50%);transition:bottom .4s}
+
+/* filters rail */
+.fgrp{margin-bottom:10px}
+.fgrp label{display:block;font-size:10px;color:var(--dim2);font-weight:600;margin-bottom:4px}
+select{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:7px;
+  padding:7px 9px;font-size:12px;cursor:pointer}
+.up li{display:flex;gap:9px;align-items:flex-start;padding:9px;border-radius:7px;background:var(--card2);
+  border:1px solid var(--line);margin-bottom:6px;list-style:none;cursor:pointer;transition:.13s}
+.up li:hover{border-color:var(--acc)}
+.up li.on{border-color:var(--acc);background:var(--accT)}
+.up .dt{font-size:9.5px;color:var(--dim2);font-weight:600;line-height:1.3;flex:0 0 54px}
+.up .nm{font-size:11.5px;font-weight:600;line-height:1.25}
+.up .sb{font-size:10px;color:var(--dim);margin-top:1px}
+.up .st{width:7px;height:7px;border-radius:50%;margin-left:auto;margin-top:4px;flex:0 0 7px}
+
+/* data center */
+.drop{border:2px dashed var(--line2);border-radius:10px;padding:24px 16px;text-align:center;transition:.15s;cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--acc);background:var(--accT)}
+.drop .ic{font-size:30px;margin-bottom:8px}
+.drop .t{font-weight:600;font-size:13px}
+.drop .s{font-size:11px;color:var(--dim2);margin-top:4px}
+.ok{color:var(--up)} .bad{color:var(--dn)}
+.spec{background:var(--card2);border:1px solid var(--line);border-radius:7px;padding:10px 12px;
+  font-size:11px;color:var(--dim);margin-top:10px}
+.spec code{font-family:"JetBrains Mono",monospace;color:var(--acc2);font-size:10.5px}
+textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:7px;padding:9px;
+  font-family:"JetBrains Mono",monospace;font-size:11px;min-height:90px;resize:vertical}
+.empty{text-align:center;padding:46px 20px;color:var(--dim)}
+.empty .ic{font-size:40px;margin-bottom:12px;opacity:.5}
+.empty h3{font-size:15px;font-weight:600;color:var(--txt);margin-bottom:6px}
+.empty p{font-size:12.5px;max-width:44ch;margin:0 auto 16px}
+.note{font-size:10.5px;color:var(--dim2);line-height:1.6;border-top:1px solid var(--line);
+  padding:11px 18px;text-align:center}
+.hide{display:none!important}
+
+.split2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.spec{overflow-wrap:anywhere}
+.sl .v{text-align:right;overflow-wrap:anywhere;padding-left:8px}
+.sl{gap:8px}
+@media(max-width:1180px){
+  .rail{position:fixed;right:0;top:0;bottom:0;background:var(--bg2);border-left:1px solid var(--line);
+    z-index:58;overflow-y:auto;padding:14px;transform:translateX(100%);transition:transform .25s}
+  .rail.open{transform:none}
+  .g23,.g2b{grid-template-columns:1fr}
+}
+@media(max-width:900px){
+  :root{--sbw:230px}
+  .side{transform:translateX(-100%)}
+  .side.open{transform:none}
+  .main{margin-left:0}
+  .hamb{display:block}
+  .scrim.on{display:block}
+  .g2,.g3,.split2,.mini{grid-template-columns:minmax(0,1fr)}
+  .mini{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cpwrap{grid-template-columns:40px minmax(0,1fr)}
+  .body{flex-direction:column}
+  .hist{height:100px}
+  .hero{grid-template-columns:auto 1fr;gap:12px}
+  .hero .hcell{grid-column:span 2;display:flex;justify-content:space-between;align-items:center;
+    border-top:1px solid var(--line);padding-top:9px;text-align:left}
+  .hcell .k{margin-bottom:0}
+  .top h2{font-size:15px}
+  .top p{display:none}
+  .content{padding:11px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="side" id="side">
+  <div class="brand">
+    <h1>ASTRO <i>NIFTY</i></h1>
+    <p>PROBABILITY ENGINE</p>
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="mstat">
+    <div class="t">DATASET</div>
+    <div id="ms"></div>
+  </div>
+</aside>
+<div class="scrim" id="scrim"></div>
+
+<div class="main">
+  <header class="top">
+    <button class="hamb" id="hamb" aria-label="Menu">☰</button>
+    <div>
+      <h2 id="ptitle">Dashboard</h2>
+      <p id="psub">Historical probabilities from planetary events</p>
+    </div>
+    <div class="sp">
+      <div class="seg" id="basisSeg" role="group" aria-label="Candle basis">
+        <span class="seglbl">Candle from</span>
+        <button data-b="open" type="button">Today's open</button>
+        <button data-b="prev" type="button">Prev close</button>
+      </div>
+      <span class="pill" id="asof">No data loaded</span>
+      <button class="iconbtn" id="themeBtn" type="button" title="Switch theme"
+        aria-label="Switch colour theme">💡</button>
+      <button class="btn ghost" id="railBtn">Filters</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <main class="content" id="content"></main>
+    <aside class="rail" id="rail"></aside>
+  </div>
+
+  <div class="note">
+    Probabilities describe what has happened historically. They are not forecasts and carry no guarantee
+    about future sessions. Always read the sample size and the difference from market baseline together.
+  </div>
+</div>
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════
+   CONSTANTS
+   ══════════════════════════════════════════════════════════════ */
+const RAASI=["Mesha","Vrishabha","Mithuna","Karka","Simha","Kanya","Tula","Vrishchika","Dhanu","Makara","Kumbha","Meena"];
+const RA_EN={Mesha:"Aries",Vrishabha:"Taurus",Mithuna:"Gemini",Karka:"Cancer",Simha:"Leo",Kanya:"Virgo",
+  Tula:"Libra",Vrishchika:"Scorpio",Dhanu:"Sagittarius",Makara:"Capricorn",Kumbha:"Aquarius",Meena:"Pisces"};
+const EN_RA={};Object.keys(RA_EN).forEach(k=>EN_RA[RA_EN[k].toLowerCase()]=k);
+const ELEM={Mesha:"Fire",Simha:"Fire",Dhanu:"Fire",Vrishabha:"Earth",Kanya:"Earth",Makara:"Earth",
+  Mithuna:"Air",Tula:"Air",Kumbha:"Air",Karka:"Water",Vrishchika:"Water",Meena:"Water"};
+const NAT={Mesha:"Movable",Karka:"Movable",Tula:"Movable",Makara:"Movable",
+  Vrishabha:"Fixed",Simha:"Fixed",Vrishchika:"Fixed",Kumbha:"Fixed",
+  Mithuna:"Dual",Kanya:"Dual",Dhanu:"Dual",Meena:"Dual"};
+const SKT={surya:"Sun",ravi:"Sun",sun:"Sun",chandra:"Moon",moon:"Moon",budha:"Mercury",mercury:"Mercury",
+  shukra:"Venus",venus:"Venus",mangal:"Mars",kuja:"Mars",mars:"Mars",guru:"Jupiter",brihaspati:"Jupiter",
+  jupiter:"Jupiter",shani:"Saturn",saturn:"Saturn",rahu:"Rahu",ketu:"Ketu",arun:"Uranus",uranus:"Uranus",
+  varun:"Neptune",neptune:"Neptune",yam:"Pluto",pluto:"Pluto"};
+const GLYPH={Sun:"☉",Moon:"☾",Mercury:"☿",Venus:"♀",Mars:"♂",Jupiter:"♃",Saturn:"♄",
+  Rahu:"☊",Ketu:"☋",Uranus:"♅",Neptune:"♆",Pluto:"♇"};
+const PCOL={Sun:["#F59E0B","#EF4444"],Moon:["#94A3B8","#CBD5E1"],Mercury:["#10B981","#06B6D4"],
+  Venus:["#8B5CF6","#EC4899"],Mars:["#EF4444","#F97316"],Jupiter:["#F59E0B","#FBBF24"],
+  Saturn:["#3B82F6","#6366F1"],Rahu:["#64748B","#475569"],Ketu:["#78716C","#57534E"],
+  Uranus:["#06B6D4","#22D3EE"],Neptune:["#3B82F6","#818CF8"],Pluto:["#7C3AED","#A855F7"]};
+const ASPN={0:"Conjunction",30:"Semi-sextile",60:"Sextile",90:"Square",120:"Trine",150:"Quincunx",180:"Opposition"};
+const CANDLES=["Marubozu Bull","Strong Bull","Moderate Bull","Small Bull","Hammer","Inverted Hammer",
+  "Doji","Spinning Top","Shooting Star","Hanging Man","Small Bear","Moderate Bear","Strong Bear","Marubozu Bear","Flat"];
+const BULLC=new Set(["Marubozu Bull","Strong Bull","Moderate Bull","Small Bull","Hammer","Inverted Hammer"]);
+const NEUTC=new Set(["Doji","Spinning Top","Flat"]);
+const MOTIONS=["Direct","Retrograde","Station Direct","Station Retrograde"];
+const BANDS=["Night","Early Morning","Before Market Open","During Market","After Market Close"];
+const RULES=["Same Day","Previous Day","Next Day"];
+const CPB=[["Near Low",0,25],["Lower Half",25,50],["Middle",50,75],["Upper Half",75,90],["Near High",90,101]];
+/* The market clock is IST. Event times are shifted into it from whatever zone the
+   source data used. Every Indian city shares +5:30, so switching between them
+   changes nothing — the setting matters when the source is UTC or a foreign city. */
+const MKT_TZ=330;
+const LOCS=[
+  {n:"Tirupati",  g:1254360, tz:330},
+  {n:"Chennai",   g:1264527, tz:330},
+  {n:"Mumbai",    g:1275339, tz:330},
+  {n:"New Delhi", g:1261481, tz:330},
+  {n:"Kolkata",   g:1275004, tz:330},
+  {n:"Bengaluru", g:1277333, tz:330},
+  {n:"Hyderabad", g:1269843, tz:330},
+  {n:"UTC / GMT", g:null,    tz:0},
+  {n:"London",    g:2643743, tz:0},
+  {n:"New York",  g:5128581, tz:-300},
+  {n:"Singapore", g:1880252, tz:480},
+  {n:"Dubai",     g:292223,  tz:240}
+];
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════ */
+const S={
+  daily:[], events:[], ybase:{}, tset:null, tdates:[],
+  page:"dash", curIdx:-1, histTab:"gap",
+  set:{gap:0.15, holidays:[], srcTz:330, loc:"Tirupati", basis:"open", theme:"dark"},
+  scope:"exact", asof:null,
+  f:{planet:"",type:"",pair:"",aspect:"",from:"",to:"",dir:"",motion:"",band:"",rule:"",y0:0,y1:0}
+};
+const $=id=>document.getElementById(id);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const f1=v=>(v==null||isNaN(v))?"—":v.toFixed(1);
+const f2=v=>(v==null||isNaN(v))?"—":v.toFixed(2);
+const pc=v=>(v==null||isNaN(v))?"—":v.toFixed(1)+"%";
+const sg=v=>(v>=0?"+":"")+v.toFixed(2);
+const sg1=v=>(v>=0?"+":"")+v.toFixed(1);
+const dstr=d=>d?d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"—";
+/* toISOString() converts to UTC and drops a day east of Greenwich (IST is +5:30).
+   Every stored / exported date goes through this instead. */
+const iso=d=>d?d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"):"";
+const tstr=t=>t?String(t[0]).padStart(2,"0")+":"+String(t[1]).padStart(2,"0"):"—";
+const dshort=d=>d?d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}):"—";
+const key=d=>d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+
+/* ══════════════════════════════════════════════════════════════
+   PARSING
+   ══════════════════════════════════════════════════════════════ */
+function normHead(h){return String(h||"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function findCol(heads,cands){
+  const n=heads.map(normHead);
+  for(const c of cands){const i=n.indexOf(c);if(i>=0)return i;}
+  for(const c of cands){const i=n.findIndex(x=>x.includes(c));if(i>=0)return i;}
+  return -1;
+}
+function parseDate(v){
+  if(v==null||v==="")return null;
+  if(v instanceof Date){
+    if(isNaN(v))return null;
+    /* SheetJS hands back UTC-midnight dates; reading local parts drops a day
+       west of Greenwich and can add one east of it. Read the UTC parts. */
+    if(v.getUTCHours()===0&&v.getUTCMinutes()===0&&v.getUTCSeconds()===0)
+      return new Date(v.getUTCFullYear(),v.getUTCMonth(),v.getUTCDate());
+    return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+  }
+  if(typeof v==="number"){ // excel serial day number
+    if(v<1||v>2958465)return null;
+    const d=new Date(Math.round((v-25569)*86400000));
+    return isNaN(d)?null:new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+  }
+  let s=String(v).trim().replace(/(\d)(st|nd|rd|th)/gi,"$1");
+  let m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if(m){let a=+m[1],b=+m[2];if(a>12&&b<=12)return new Date(+m[3],b-1,a);return new Date(+m[3],b-1,a);}
+  const MN={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  m=s.match(/^(\d{1,2})[\s-]*([a-z]{3,})[\s,-]*(\d{4})/i);
+  if(m&&MN[m[2].slice(0,3).toLowerCase()]!=null)return new Date(+m[3],MN[m[2].slice(0,3).toLowerCase()],+m[1]);
+  m=s.match(/^([a-z]{3,})[\s-]*(\d{1,2})[\s,-]*(\d{4})/i);
+  if(m&&MN[m[1].slice(0,3).toLowerCase()]!=null)return new Date(+m[3],MN[m[1].slice(0,3).toLowerCase()],+m[2]);
+  const d=new Date(s);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function parseTime(v){
+  if(v==null||v==="")return null;
+  if(typeof v==="number"&&v<1){const t=Math.round(v*1440);return[Math.floor(t/60),t%60];}
+  const m=String(v).match(/(\d{1,2}):(\d{2})\s*([ap]m)?/i);
+  if(!m)return null;
+  let h=+m[1];const mi=+m[2];
+  if(m[3]){const ap=m[3].toLowerCase();if(ap==="pm"&&h!==12)h+=12;if(ap==="am"&&h===12)h=0;}
+  return[h%24,mi];
+}
+function normPlanet(v){
+  const s=String(v||"").toLowerCase().replace(/[^a-z]/g,"");
+  for(const k in SKT)if(s===k)return SKT[k];
+  for(const k in SKT)if(s.includes(k))return SKT[k];
+  return null;
+}
+function normRaasi(v){
+  const s=String(v||"").trim();
+  for(const r of RAASI)if(new RegExp("^"+r+"$","i").test(s))return r;
+  const e=EN_RA[s.toLowerCase()];if(e)return e;
+  for(const r of RAASI)if(new RegExp("\\b"+r+"\\b","i").test(s))return r;
+  for(const k in EN_RA)if(new RegExp("\\b"+k+"\\b","i").test(s))return EN_RA[k];
+  return null;
+}
+function rows2obj(rows){
+  if(!rows||rows.length<2)return{heads:[],data:[]};
+  const heads=rows[0].map(h=>String(h==null?"":h).trim());
+  return{heads,data:rows.slice(1).filter(r=>r.some(c=>c!=null&&c!==""))};
+}
+function readFile(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onerror=()=>rej(new Error("Could not read the file"));
+    fr.onload=e=>{
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array",cellDates:false});
+        const sh=wb.Sheets[wb.SheetNames[0]];
+        res(rows2obj(XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null})));
+      }catch(err){rej(err);}
+    };
+    fr.readAsArrayBuffer(file);
+  });
+}
+function splitRow(line,d){
+  const out=[];let cur="",q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; }
+    else if(c===d&&!q){ out.push(cur);cur=""; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(x=>x.trim());
+}
+function parsePasted(txt){
+  const lines=txt.replace(/^\uFEFF/,"").trim().split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length)return{heads:[],data:[]};
+  const d=lines[0].includes("\t")?"\t":",";
+  return rows2obj(lines.map(l=>splitRow(l,d)));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INGEST
+   ══════════════════════════════════════════════════════════════ */
+function candleOf(o,h,l,c){
+  const r=h-l; if(r<=0)return "Flat";
+  const bp=Math.abs(c-o)/r*100, uw=(h-Math.max(o,c))/r*100, lw=(Math.min(o,c)-l)/r*100, bu=c>=o;
+  if(bp>90)return bu?"Marubozu Bull":"Marubozu Bear";
+  if(bp<5)return "Doji";
+  if(lw>55&&bp<35&&uw<15)return bu?"Hammer":"Hanging Man";
+  if(uw>55&&bp<35&&lw<15)return bu?"Inverted Hammer":"Shooting Star";
+  if(bp<25&&uw>20&&lw>20)return "Spinning Top";
+  if(bu)return bp>=60?"Strong Bull":bp>=30?"Moderate Bull":"Small Bull";
+  return bp>=60?"Strong Bear":bp>=30?"Moderate Bear":"Small Bear";
+}
+function ingestNifty(t){
+  const H=t.heads;
+  const iD=findCol(H,["date","dt","tradedate","timestamp"]),
+        iO=findCol(H,["open","o"]),iH=findCol(H,["high","h"]),
+        iL=findCol(H,["low","l"]),iC=findCol(H,["close","c","closeprice","ltp"]);
+  if(iD<0||iO<0||iH<0||iL<0||iC<0)
+    throw new Error("Need columns Date, Open, High, Low, Close. Found: "+H.join(", "));
+  const out=[];
+  t.data.forEach(r=>{
+    const d=parseDate(r[iD]); if(!d)return;
+    const o=+r[iO],h=+r[iH],l=+r[iL],c=+r[iC];
+    if(![o,h,l,c].every(x=>isFinite(x)&&x>0))return;
+    out.push({d,o,h,l,c});
+  });
+  out.sort((a,b)=>a.d-b.d);
+  const seen=new Set(),uniq=[];
+  out.forEach(x=>{const k=key(x.d);if(!seen.has(k)){seen.add(k);uniq.push(x);}});
+  const tr=[];
+  uniq.forEach((x,i)=>{
+    const p=i?uniq[i-1].c:null;
+    x.pc=p; x.rng=x.h-x.l;
+    x.gapPts=p?x.o-p:null; x.gap=p?(x.o-p)/p*100:null;
+    x.cvo=(x.c-x.o)/x.o*100; x.cvpc=p?(x.c-p)/p*100:null;
+    /* ── version A · anchored on TODAY'S OPEN (the standard candle) ── */
+    x.rngPctA=x.rng/x.c*100;
+    x.bodyA=x.rng>0?Math.abs(x.c-x.o)/x.rng*100:0;
+    x.upwA=x.rng>0?(x.h-Math.max(x.o,x.c))/x.rng*100:0;
+    x.lowA=x.rng>0?(Math.min(x.o,x.c)-x.l)/x.rng*100:0;
+    x.cpA=x.rng>0?(x.c-x.l)/x.rng*100:50;
+    x.candleA=candleOf(x.o,x.h,x.l,x.c);
+    x.dirA=x.c>=x.o?1:0;
+    /* ── version B · anchored on YESTERDAY'S CLOSE ──
+       The gap becomes part of the body, so the range must stretch to hold it. */
+    if(p!=null){
+      const hB=Math.max(x.h,p), lB=Math.min(x.l,p), rB=hB-lB;
+      x.rngB=rB; x.rngPctB=rB/x.c*100;
+      x.bodyB=rB>0?Math.abs(x.c-p)/rB*100:0;
+      x.upwB=rB>0?(hB-Math.max(p,x.c))/rB*100:0;
+      x.lowB=rB>0?(Math.min(p,x.c)-lB)/rB*100:0;
+      x.cpB=rB>0?(x.c-lB)/rB*100:50;
+      x.candleB=candleOf(p,hB,lB,x.c);
+      x.dirB=x.c>=p?1:0;
+    }else{
+      x.rngB=x.rng;x.rngPctB=x.rngPctA;x.bodyB=x.bodyA;x.upwB=x.upwA;
+      x.lowB=x.lowA;x.cpB=x.cpA;x.candleB=x.candleA;x.dirB=x.dirA;
+    }
+    tr.push(p==null?x.rng:Math.max(x.rng,Math.abs(x.h-p),Math.abs(x.l-p)));
+    x.atr=i>=13?tr.slice(i-13,i+1).reduce((s,v)=>s+v,0)/14/x.c*100:null;
+  });
+  S.daily=uniq.filter(x=>x.pc!=null);
+  S.tdates=S.daily.map(x=>x.d);
+  S.tset=new Map(); S.daily.forEach((x,i)=>S.tset.set(key(x.d),i));
+  applyBasis();
+  return S.daily.length;
+}
+/* Point the live fields at whichever version is selected. Both are always
+   in memory, so switching is instant and nothing is recomputed from source. */
+function applyBasis(){
+  const B=S.set.basis==="prev";
+  S.daily.forEach(x=>{
+    x.candle = B?x.candleB :x.candleA;
+    x.body   = B?x.bodyB   :x.bodyA;
+    x.upw    = B?x.upwB    :x.upwA;
+    x.low    = B?x.lowB    :x.lowA;
+    x.cp     = B?x.cpB     :x.cpA;
+    x.rngPct = B?x.rngPctB :x.rngPctA;
+  });
+  buildBaselines();
+}
+function basisLabel(){return S.set.basis==="prev"?"previous close":"today's open";}
+/* When an as-of date is set the whole engine pretends the future does not
+   exist: baselines, market stats and the event pool all stop at the cutoff.
+   That is what keeps a forward test honest — no repainting. */
+function cutKey(){return S.asof?key(S.asof):Infinity;}
+function visDaily(){const k=cutKey();return k===Infinity?S.daily:S.daily.filter(x=>key(x.d)<=k);}
+function buildBaselines(){
+  const g={};
+  visDaily().forEach(x=>{
+    const y=x.d.getFullYear(); (g[y]=g[y]||[]).push(x);
+  });
+  S.ybase={};
+  Object.keys(g).forEach(y=>{
+    const a=g[y],n=a.length,T=S.set.gap;
+    S.ybase[y]={n,
+      gu:a.filter(x=>x.gap>T).length/n, gd:a.filter(x=>x.gap<-T).length/n,
+      gr:a.filter(x=>x.cvo>=0).length/n, ab:a.filter(x=>x.cvpc>=0).length/n,
+      ret:a.reduce((s,x)=>s+x.cvpc,0)/n, rng:a.reduce((s,x)=>s+x.rngPct,0)/n,
+      cp:a.reduce((s,x)=>s+x.cp,0)/n};
+  });
+}
+function bandOf(t){
+  if(!t)return "Unknown";
+  const x=t[0]*60+t[1];
+  return x<240?"Night":x<420?"Early Morning":x<555?"Before Market Open":x<930?"During Market":"After Market Close";
+}
+/* Shift an event's raw clock time into market time (IST). If the shift crosses
+   midnight the calendar date moves with it, which is why this runs before matching. */
+function applyTz(e){
+  const shift=MKT_TZ-(S.set.srcTz||0);
+  if(!e.rawDate)e.rawDate=e.date;
+  if(e.rawTime===undefined)e.rawTime=e.time||null;
+  if(!e.rawTime||!shift){
+    e.date=new Date(e.rawDate.getFullYear(),e.rawDate.getMonth(),e.rawDate.getDate());
+    e.time=e.rawTime?[e.rawTime[0],e.rawTime[1]]:null;
+  }else{
+    const dt=new Date(e.rawDate.getFullYear(),e.rawDate.getMonth(),e.rawDate.getDate(),
+                      e.rawTime[0],e.rawTime[1]);
+    dt.setMinutes(dt.getMinutes()+shift);
+    e.date=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
+    e.time=[dt.getHours(),dt.getMinutes()];
+  }
+  e.band=bandOf(e.time);
+  return e;
+}
+function matchDay(d){
+  if(!S.tset)return[null,null];
+  const k=key(d);
+  if(S.tset.has(k))return[S.tdates[S.tset.get(k)],"Same Day"];
+  const p=new Date(d); p.setDate(p.getDate()-1);
+  if(S.tset.has(key(p)))return[S.tdates[S.tset.get(key(p))],"Previous Day"];
+  if(!S.tdates.length||d<S.tdates[0])return[null,null];
+  for(let i=0;i<S.tdates.length;i++)if(S.tdates[i]>d)return[S.tdates[i],"Next Day"];
+  return[null,null];
+}
+function ingestTransits(t){
+  const H=t.heads;
+  const iD=findCol(H,["date","dt"]),iP=findCol(H,["planet","graha","body"]),
+        iR=findCol(H,["raasi","rasi","sign","torasi","tosign","zodiac"]),
+        iT=findCol(H,["time","clock","hour"]),
+        iF=findCol(H,["retrograde","retro","motion","direction","flag"]),
+        iFr=findCol(H,["fromrasi","fromsign","from"]);
+  if(iD<0||iP<0||iR<0)throw new Error("Need columns Date, Planet, Raasi. Found: "+H.join(", "));
+  const raw=[];
+  t.data.forEach(r=>{
+    const d=parseDate(r[iD]),p=normPlanet(r[iP]),ra=normRaasi(r[iR]);
+    if(!d||!p||!ra)return;
+    const fl=iF>=0?String(r[iF]||"").toLowerCase():"";
+    raw.push({d,planet:p,raasi:ra,time:iT>=0?parseTime(r[iT]):null,
+      retro:/retro|vakri|\br\b/.test(fl)?"Retrograde":"Forward",
+      from:iFr>=0?normRaasi(r[iFr]):null});
+  });
+  raw.sort((a,b)=>a.d-b.d||a.planet.localeCompare(b.planet));
+  const prev={},prevR={};
+  raw.forEach(e=>{
+    const pf=prev[e.planet];
+    e.motion = pf==null ? (e.retro==="Forward"?"Direct":"Retrograde")
+             : (e.retro!==pf ? (e.retro==="Retrograde"?"Station Retrograde":"Station Direct")
+                             : (e.retro==="Forward"?"Direct":"Retrograde"));
+    prev[e.planet]=e.retro;
+    if(!e.from)e.from=prevR[e.planet]||null;
+    prevR[e.planet]=e.raasi;
+  });
+  return raw.map(e=>{
+    const o={cls:"Transit",planet:e.planet,raasi:e.raasi,from:e.from,aspect:null,deg:null,
+      p2:null,motion:e.motion,rawDate:e.d,rawTime:e.time,date:e.d,time:e.time,
+      name:e.planet+" enters "+e.raasi};
+    applyTz(o);
+    const[md,rule]=matchDay(o.date); o.md=md; o.rule=rule; o.valid=!!md;
+    return o;
+  });
+}
+function ingestAspects(t){
+  const H=t.heads;
+  const iD=findCol(H,["date","dt"]),
+        iA=findCol(H,["aspect","event","aspecttype"]),
+        iDg=findCol(H,["degree","deg","angle"]),
+        iP1=findCol(H,["planet1","p1","planeta","firstplanet"]),
+        iP2=findCol(H,["planet2","p2","planetb","secondplanet"]),
+        iPr=findCol(H,["pair","planets","combination"]),
+        iT=findCol(H,["time","clock"]);
+  if(iD<0)throw new Error("Need a Date column. Found: "+H.join(", "));
+  const out=[];
+  t.data.forEach(r=>{
+    const d=parseDate(r[iD]); if(!d)return;
+    let p1=iP1>=0?normPlanet(r[iP1]):null, p2=iP2>=0?normPlanet(r[iP2]):null;
+    let deg=iDg>=0?parseFloat(String(r[iDg]).replace(/[^\d.-]/g,"")):NaN;
+    let asp=iA>=0?String(r[iA]||""):"";
+    if((!p1||!p2)&&iPr>=0){const m=String(r[iPr]).split(/&|and|\+|-|,/);
+      if(m.length>=2){p1=p1||normPlanet(m[0]);p2=p2||normPlanet(m[1]);}}
+    if((!p1||!p2)&&asp){const m=asp.match(/([a-z]+)\s*(?:&|and|\+)\s*([a-z]+)/i);
+      if(m){p1=p1||normPlanet(m[1]);p2=p2||normPlanet(m[2]);}}
+    if(isNaN(deg)&&asp){const m=asp.match(/(\d{1,3})\s*(?:°|deg)/i); if(m)deg=+m[1];}
+    let name=null;
+    if(isNaN(deg)&&asp){
+      const lk={conjunction:0,conjunct:0,sextile:60,square:90,trine:120,opposition:180,opposite:180};
+      for(const k in lk)if(asp.toLowerCase().includes(k)){deg=lk[k];break;}
+    }
+    if(isNaN(deg))return;
+    if(!p1||!p2)return;
+    name=ASPN[deg]||(deg+"°");
+    const pair=[p1,p2].sort().join(" & ");
+    const rt=iT>=0?parseTime(r[iT]):null;
+    const o={cls:"Aspect",planet:p1,p2,raasi:null,from:null,aspect:name,deg,
+      motion:null,rawDate:d,rawTime:rt,date:d,time:rt,name:pair+" "+name,pair};
+    applyTz(o);
+    const[md,rule]=matchDay(o.date); o.md=md; o.rule=rule; o.valid=!!md;
+    out.push(o);
+  });
+  out.sort((a,b)=>a.date-b.date);
+  return out;
+}
+function rebuildEvents(){
+  S.events.forEach(e=>{applyTz(e);const[md,rule]=matchDay(e.date);e.md=md;e.rule=rule;e.valid=!!md;});
+  S.events.sort((a,b)=>a.date-b.date);
+  const ys=S.events.filter(e=>e.valid).map(e=>e.md.getFullYear());
+  if(ys.length){S.f.y0=S.f.y0||Math.min(...ys);S.f.y1=S.f.y1||Math.max(...ys);}
+  S.curIdx=pickCurrent();
+}
+function pickCurrent(){
+  const rows=filtered(); if(!rows.length)return -1;
+  const now=new Date(); now.setHours(0,0,0,0);
+  const up=rows.findIndex(e=>e.date>=now);
+  return up>=0?S.events.indexOf(rows[up]):S.events.indexOf(rows[rows.length-1]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ANALYTICS
+   ══════════════════════════════════════════════════════════════ */
+function dayOf(e){
+  if(!e||!e.md||!S.tset)return null;
+  const i=S.tset.get(key(e.md)); return i==null?null:S.daily[i];
+}
+function filtered(extra){
+  const f=S.f;
+  const ck=cutKey();
+  return S.events.filter(e=>{
+    if(!e.valid)return false;
+    if(key(e.md)>ck)return false;
+    if(f.type&&e.cls!==f.type)return false;
+    if(f.planet&&e.planet!==f.planet&&e.p2!==f.planet)return false;
+    if(f.pair&&e.pair!==f.pair)return false;
+    if(f.aspect&&e.aspect!==f.aspect)return false;
+    if(f.to&&e.raasi!==f.to)return false;
+    if(f.from&&e.from!==f.from)return false;
+    if(f.dir){const d=e.motion&&e.motion.includes("Retro")?"Retrograde":"Direct";if(d!==f.dir)return false;}
+    if(f.motion&&e.motion!==f.motion)return false;
+    if(f.band&&e.band!==f.band)return false;
+    if(f.rule&&e.rule!==f.rule)return false;
+    const y=e.md.getFullYear();
+    if(f.y0&&y<f.y0)return false;
+    if(f.y1&&y>f.y1)return false;
+    if(extra&&!extra(e))return false;
+    return true;
+  });
+}
+function expect(rows,k){
+  const mix={};rows.forEach(e=>{const y=e.md.getFullYear();mix[y]=(mix[y]||0)+1;});
+  let a=0,b=0;
+  for(const y in mix){const base=S.ybase[y];if(!base)continue;a+=base[k]*mix[y];b+=mix[y];}
+  return b?a/b:0;
+}
+function median(a){if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function stats(rows){
+  const D=rows.map(dayOf).filter(Boolean),n=D.length;
+  if(!n)return null;
+  const T=S.set.gap;
+  const gu=D.filter(x=>x.gap>T),gd=D.filter(x=>x.gap<-T),fl=n-gu.length-gd.length;
+  const grn=D.filter(x=>x.cvo>=0).length, abv=D.filter(x=>x.cvpc>=0).length;
+  const eGu=expect(rows,"gu")*100,eGr=expect(rows,"gr")*100,eAb=expect(rows,"ab")*100,
+        eRt=expect(rows,"ret"),eRg=expect(rows,"rng"),eGd=expect(rows,"gd")*100;
+  const cc={};D.forEach(x=>cc[x.candle]=(cc[x.candle]||0)+1);
+  const cpb=CPB.map(([nm,lo,hi])=>({nm,n:D.filter(x=>x.cp>=lo&&x.cp<hi).length}));
+  const cf=confOf(n), conf=[cf[0].toUpperCase(),cf[1],cf[2]];
+  return{n,D,rows,conf,
+    guN:gu.length,gdN:gd.length,flN:fl,
+    guP:gu.length/n*100, gdP:gd.length/n*100, flP:fl/n*100,
+    guPts:gu.length?gu.reduce((s,x)=>s+x.gapPts,0)/gu.length:0,
+    gdPts:gd.length?gd.reduce((s,x)=>s+x.gapPts,0)/gd.length:0,
+    medGapPts:median(D.map(x=>x.gapPts)),
+    maxGap:Math.max(...D.map(x=>x.gap)), minGap:Math.min(...D.map(x=>x.gap)),
+    sdGap:Math.sqrt(D.reduce((s,x)=>s+Math.pow(x.gap-D.reduce((a,y)=>a+y.gap,0)/n,2),0)/n),
+    grnP:grn/n*100, redP:(n-grn)/n*100, abvP:abv/n*100, blwP:(n-abv)/n*100,
+    retAvg:D.reduce((s,x)=>s+x.cvpc,0)/n, retMed:median(D.map(x=>x.cvpc)),
+    cvoAvg:D.reduce((s,x)=>s+x.cvo,0)/n,
+    retMax:Math.max(...D.map(x=>x.cvpc)), retMin:Math.min(...D.map(x=>x.cvpc)),
+    rngAvg:D.reduce((s,x)=>s+x.rngPct,0)/n, rngMed:median(D.map(x=>x.rngPct)),
+    rngMax:Math.max(...D.map(x=>x.rngPct)), rngMin:Math.min(...D.map(x=>x.rngPct)),
+    bodyAvg:D.reduce((s,x)=>s+x.body,0)/n,
+    upwAvg:D.reduce((s,x)=>s+x.upw,0)/n, lowAvg:D.reduce((s,x)=>s+x.low,0)/n,
+    atrAvg:(()=>{const a=D.filter(x=>x.atr!=null);return a.length?a.reduce((s,x)=>s+x.atr,0)/a.length:NaN;})(),
+    cpAvg:D.reduce((s,x)=>s+x.cp,0)/n, cpb, candles:cc,
+    eGu,eGd,eGr,eAb,eRt,eRg,
+    dGu:gu.length/n*100-eGu, dGd:gd.length/n*100-eGd, dGr:grn/n*100-eGr,
+    dAb:abv/n*100-eAb, dRt:D.reduce((s,x)=>s+x.cvpc,0)/n-eRt,
+    dRg:D.reduce((s,x)=>s+x.rngPct,0)/n-eRg};
+}
+function marketStats(){
+  const D=visDaily(),n=D.length; if(!n)return null;
+  const T=S.set.gap;
+  const gu=D.filter(x=>x.gap>T),gd=D.filter(x=>x.gap<-T);
+  return{n, guP:gu.length/n*100, gdP:gd.length/n*100, flP:(n-gu.length-gd.length)/n*100,
+    grnP:D.filter(x=>x.cvo>=0).length/n*100, abvP:D.filter(x=>x.cvpc>=0).length/n*100,
+    retAvg:D.reduce((s,x)=>s+x.cvpc,0)/n, rngAvg:D.reduce((s,x)=>s+x.rngPct,0)/n,
+    cpAvg:D.reduce((s,x)=>s+x.cp,0)/n, bodyAvg:D.reduce((s,x)=>s+x.body,0)/n,
+    guPts:gu.length?gu.reduce((s,x)=>s+x.gapPts,0)/gu.length:0,
+    gdPts:gd.length?gd.reduce((s,x)=>s+x.gapPts,0)/gd.length:0};
+}
+/* ── ANALYSIS SCOPE ──────────────────────────────────────────
+   A ladder of progressively wider pools built from the selected event.
+   Whichever rung is active drives EVERY page, so the whole app stays
+   on one question until you deliberately widen it. */
+function scopeOptions(ev){
+  const ck=cutKey();
+  const all=S.events.filter(e=>e.valid&&key(e.md)<=ck), o=[];
+  if(!ev)return[{key:"filter",label:"Filter rail",desc:"whatever the filter rail allows",rows:filtered()}];
+  if(ev.cls==="Transit"){
+    o.push({key:"exact",label:ev.planet+" → "+ev.raasi,
+      desc:"only this exact transit — this planet entering this sign",
+      rows:all.filter(e=>e.cls==="Transit"&&e.planet===ev.planet&&e.raasi===ev.raasi)});
+    o.push({key:"planet",label:ev.planet+" · any rasi",
+      desc:"every sign change by "+ev.planet+", whichever sign it entered",
+      rows:all.filter(e=>e.cls==="Transit"&&e.planet===ev.planet)});
+    o.push({key:"rasi",label:"Any planet → "+ev.raasi,
+      desc:"every planet entering "+ev.raasi+", whichever planet it was",
+      rows:all.filter(e=>e.cls==="Transit"&&e.raasi===ev.raasi)});
+    if(ev.motion){
+      o.push({key:"pmotion",label:ev.planet+" · "+ev.motion,
+        desc:ev.planet+" while "+ev.motion.toLowerCase()+", any sign",
+        rows:all.filter(e=>e.cls==="Transit"&&e.planet===ev.planet&&e.motion===ev.motion)});
+      o.push({key:"motion",label:"Any planet · "+ev.motion,
+        desc:"every planet in the "+ev.motion.toLowerCase()+" state",
+        rows:all.filter(e=>e.cls==="Transit"&&e.motion===ev.motion)});
+    }
+    if(ELEM[ev.raasi])o.push({key:"elem",label:ev.planet+" → "+ELEM[ev.raasi]+" signs",
+      desc:ev.planet+" entering any "+ELEM[ev.raasi].toLowerCase()+" sign",
+      rows:all.filter(e=>e.cls==="Transit"&&e.planet===ev.planet&&ELEM[e.raasi]===ELEM[ev.raasi])});
+    o.push({key:"allclass",label:"All transits",desc:"every sign change in the data",
+      rows:all.filter(e=>e.cls==="Transit")});
+  }else{
+    /* Aspects get no ladder. Widening a pair or an angle is already a single
+       dropdown on the filter rail, so a second way to do it would only let the
+       two disagree. Here it is just: this exact aspect, or the rail. */
+    o.push({key:"exact",label:ev.pair+" "+ev.aspect,
+      desc:"only this pair at this exact angle — widen aspects with the Pair and Aspect Angle dropdowns on the rail",
+      rows:all.filter(e=>e.cls==="Aspect"&&e.pair===ev.pair&&e.aspect===ev.aspect)});
+  }
+  o.push({key:"filter",label:"Filter rail",
+    desc:"whatever the filter rail allows"+(S.asof?", up to the freeze date":""),rows:filtered()});
+  const seen=new Set();
+  return o.filter(x=>x.rows.length&&!seen.has(x.key)&&seen.add(x.key));
+}
+function analysisPool(){
+  const ev=S.events[S.curIdx];
+  const opts=scopeOptions(ev);
+  /* a transit rung has no meaning on an aspect, so fall back rather than break */
+  let hit=opts.find(o=>o.key===S.scope);
+  if(!hit)hit=opts.find(o=>o.key==="exact")||opts[opts.length-1];
+  return{rows:hit.rows,label:hit.label,desc:hit.desc,kind:hit.key,ev,opts};
+}
+function scopeBar(){
+  const P=analysisPool();
+  if(!P.opts||P.opts.length<2)return "";
+  const ev=S.events[S.curIdx];
+  /* aspects: compact switch, no ladder */
+  if(ev&&ev.cls==="Aspect"){
+    const c=confOf(P.rows.length);
+    return `<div class="scopebar" style="padding:9px 13px">
+      <div class="sbhead" style="margin-bottom:0;align-items:center">
+        <div style="min-width:0">
+          <div class="sbk">ANALYSING · every page below follows this</div>
+          <div class="sbl" style="font-size:14px">${esc(P.label)}
+            <span class="mono" style="color:${c[2]};font-size:12.5px">
+              n=${P.rows.length.toLocaleString()} · ${c[0]}</span></div>
+          <div class="sbd">Widen an aspect with the <b style="color:var(--acc2)">Planet Pair</b> and
+            <b style="color:var(--acc2)">Aspect Angle</b> dropdowns on the filter rail.</div>
+        </div>
+        <div class="sbchips" style="margin-left:auto">${P.opts.map(o=>{
+          const cc=confOf(o.rows.length);
+          return `<button class="sbchip${o.key===P.kind?" on":""}" onclick="setScope('${o.key}')"
+            title="${esc(o.desc)}"><span class="dot" style="background:${cc[2]}"></span>
+            ${o.key==="exact"?"This aspect":"Filter rail"}<b class="mono">${o.rows.length.toLocaleString()}</b></button>`;}).join("")}
+        </div>
+      </div>
+    </div>`;
+  }
+  return `<div class="scopebar">
+    <div class="sbhead">
+      <div style="min-width:0">
+        <div class="sbk">TRANSIT SCOPE · every page below follows this</div>
+        <div class="sbl">${esc(P.label)}
+          <span class="mono" style="color:${confOf(P.rows.length)[2]};font-size:13px">
+            n=${P.rows.length.toLocaleString()} · ${confOf(P.rows.length)[0]}</span></div>
+        <div class="sbd">${esc(P.desc)}</div>
+      </div>
+    </div>
+    <div class="sbchips">${P.opts.map(o=>{
+      const c=confOf(o.rows.length);
+      return `<button class="sbchip${o.key===P.kind?" on":""}" onclick="setScope('${o.key}')"
+        title="${esc(o.desc)}"><span class="dot" style="background:${c[2]}"></span>
+        ${esc(o.label)}<b class="mono">${o.rows.length.toLocaleString()}</b></button>`;}).join("")}
+    </div>
+  </div>`;
+}
+function confOf(n){
+  return n>=200?["Very high",5,"#22C55E"]:n>=100?["High",4,"#22C55E"]
+       :n>=50?["Medium",3,"#F59E0B"]:n>=20?["Low",2,"#F97316"]:["Very low",1,"#EF4444"];
+}
+window.setScope=k=>{S.scope=k;save();render();};
+
+/* similar events for the selected one */
+function similar(e,cut){
+  if(!e)return[];
+  const ck=cut===undefined?cutKey():cut;
+  const ok=x=>x.valid&&key(x.md)<=ck;
+  if(e.cls==="Transit")
+    return S.events.filter(x=>ok(x)&&x.cls==="Transit"&&x.planet===e.planet&&x.raasi===e.raasi);
+  return S.events.filter(x=>ok(x)&&x.cls==="Aspect"&&x.pair===e.pair&&x.aspect===e.aspect);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SMALL RENDER HELPERS
+   ══════════════════════════════════════════════════════════════ */
+const col=v=>Math.abs(v)<0.05?"var(--dim)":v>0?"var(--up)":"var(--dn)";
+function bar(label,pctv,c,extra){
+  return `<div class="brow"><span class="l">${esc(label)}</span>
+    <span class="t"><i style="width:${Math.max(0,Math.min(100,pctv))}%;background:${c}"></i></span>
+    <span class="p">${extra!=null?extra:pc(pctv)}</span></div>`;
+}
+function donut(pctv,c,size){
+  const R=size/2-4,C=2*Math.PI*R,v=Math.max(0,Math.min(100,pctv));
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${R}" fill="none" stroke="var(--card3)" stroke-width="6"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${R}" fill="none" stroke="${c}" stroke-width="6"
+      stroke-dasharray="${C}" stroke-dashoffset="${C*(1-v/100)}" stroke-linecap="round"
+      transform="rotate(-90 ${size/2} ${size/2})"/></svg>`;
+}
+function stars(k,c){
+  let s="";for(let i=0;i<5;i++)s+=`<span style="color:${i<k?c:"var(--card3)"};font-size:15px">★</span>`;
+  return s;
+}
+function histogram(vals,bins,fmt,c){
+  if(!vals.length)return `<div class="empty" style="padding:20px">No data</div>`;
+  const cnt=bins.map(()=>0);
+  vals.forEach(v=>{
+    for(let i=0;i<bins.length;i++){
+      const[lo,hi]=bins[i].r;
+      if(v>=lo&&v<hi){cnt[i]++;break;}
+    }
+  });
+  const mx=Math.max(...cnt)||1,tot=vals.length;
+  return `<div class="hist">${bins.map((b,i)=>{
+    const p=cnt[i]/tot*100;
+    return `<div class="b" title="${esc(b.l)} — ${cnt[i]} (${p.toFixed(1)}%)">
+      <i style="height:${cnt[i]/mx*88}%;background:${typeof c==="function"?c(b,i):c}"></i>
+      <span>${esc(b.l)}</span></div>`;}).join("")}</div>`;
+}
+function candleSVG(name,w,h){
+  const M={"Marubozu Bull":[.02,.05,.95,.98,1],"Strong Bull":[.06,.14,.86,.94,1],
+    "Moderate Bull":[.1,.28,.72,.9,1],"Small Bull":[.08,.4,.6,.92,1],
+    "Hammer":[.04,.08,.32,.96,1],"Inverted Hammer":[.04,.68,.92,.96,1],
+    "Doji":[.06,.48,.52,.94,1],"Spinning Top":[.1,.36,.64,.9,1],
+    "Shooting Star":[.04,.08,.32,.96,0],"Hanging Man":[.04,.68,.92,.96,0],
+    "Small Bear":[.08,.4,.6,.92,0],"Moderate Bear":[.1,.28,.72,.9,0],
+    "Strong Bear":[.06,.14,.86,.94,0],"Marubozu Bear":[.02,.05,.95,.98,0],
+    "Flat":[.45,.49,.51,.55,1]};
+  const m=M[name]||M["Doji"],c=m[4]?"var(--up)":"var(--dn)";
+  const yt=(1-m[3])*h,bt=(1-m[2])*h,bb=(1-m[1])*h,yb=(1-m[0])*h,x=w/2,bw=w*.52;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <line x1="${x}" y1="${yt}" x2="${x}" y2="${bt}" stroke="${c}" stroke-width="2"/>
+    <rect x="${x-bw/2}" y="${bt}" width="${bw}" height="${Math.max(2,bb-bt)}" fill="${c}" rx="1.5"/>
+    <line x1="${x}" y1="${bb}" x2="${x}" y2="${yb}" stroke="${c}" stroke-width="2"/></svg>`;
+}
+function noData(msg){
+  return `<div class="empty"><div class="ic">◷</div><h3>Nothing to show yet</h3>
+    <p>${esc(msg||"Load your Nifty history and planetary data to build the engine.")}</p>
+    <button class="btn" onclick="go('data')">Open Data Center</button></div>`;
+}
+function noMatch(){
+  return `<div class="empty"><div class="ic">⌕</div><h3>No events match these filters</h3>
+    <p>Widen the year range or clear a filter to bring events back.</p>
+    <button class="btn ghost" onclick="resetF()">Reset filters</button></div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PAGES
+   ══════════════════════════════════════════════════════════════ */
+const PAGES=[
+  {id:"dash",ic:"⌂",t:"Dashboard",s:"Historical probabilities from planetary events"},
+  {id:"upcoming",ic:"◲",t:"Upcoming Events",s:"Future events with holiday-adjusted trading dates"},
+  {g:"ANALYSIS"},
+  {id:"planet",ic:"◉",t:"Planet Analysis",s:"Every graha compared against market baseline"},
+  {id:"rasi",ic:"◈",t:"Rasi Analysis",s:"Behaviour by sign entered"},
+  {id:"motion",ic:"◐",t:"Motion Analysis",s:"Direct, retrograde and station states"},
+  {id:"time",ic:"◔",t:"Time Analysis",s:"Where in the clock the event lands"},
+  {id:"candle",ic:"▮",t:"Candle Analysis",s:"Which candle forms, by group"},
+  {id:"range",ic:"◫",t:"Range Analysis",s:"Expected day range and close position"},
+  {g:"DATA"},
+  {id:"verify",ic:"◷",t:"History Verify",s:"Walk-forward test — predict with past data only, score against what happened"},
+  {id:"hist",ic:"☰",t:"Historical Events",s:"Every matched event, searchable"},
+  {id:"base",ic:"▤",t:"Market Baseline",s:"What an ordinary session looks like"},
+  {id:"data",ic:"⛁",t:"Data Center",s:"Load and manage your raw tables"},
+  {id:"settings",ic:"⚙",t:"Settings",s:"Thresholds, holidays and export"}
+];
+function go(id){S.page=id;render();window.scrollTo(0,0);
+  if(window.innerWidth<=900){$("side").classList.remove("open");$("scrim").classList.remove("on");}}
+window.go=go;
+
+function renderNav(){
+  const n=$("nav");n.innerHTML="";
+  PAGES.forEach(p=>{
+    if(p.g){n.appendChild(el("div","grp",p.g));return;}
+    const b=el("button",S.page===p.id?"on":"",`<span class="ic">${p.ic}</span>${esc(p.t)}`);
+    b.onclick=()=>go(p.id); n.appendChild(b);
+  });
+  const p=PAGES.find(x=>x.id===S.page)||PAGES[0];
+  $("ptitle").textContent=p.t; $("psub").textContent=p.s;
+  const m=marketStats();
+  $("ms").innerHTML = S.daily.length
+    ? `<div style="color:var(--dim)"><span class="dot" style="background:var(--up)"></span>${S.daily.length.toLocaleString()} sessions</div>
+       <div class="big mono">${S.daily[S.daily.length-1].c.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+       <div class="mono" style="color:${col(S.daily[S.daily.length-1].cvpc)}">${sg(S.daily[S.daily.length-1].cvpc)}%</div>
+       <div style="color:var(--dim2);margin-top:5px">${S.events.filter(e=>e.valid).length.toLocaleString()} matched events</div>`
+    : `<div style="color:var(--dim2)"><span class="dot" style="background:var(--dn)"></span>No data loaded</div>`;
+  const A=$("asof");
+  if(!S.daily.length){A.textContent="No data loaded";A.style.borderColor="";A.style.color="";}
+  else if(S.asof){
+    A.innerHTML='<span class="dot" style="background:var(--amb)"></span>FROZEN at '+dstr(S.asof);
+    A.style.borderColor="var(--amb)";A.style.color="var(--amb)";
+    A.title="History Verify is active — every page is using data up to this date only";
+  }else{
+    A.textContent="Data to "+dstr(S.daily[S.daily.length-1].d);
+    A.style.borderColor="";A.style.color="";A.title="";
+  }
+  wireBasis(); applyTheme();
+}
+
+/* ── DASHBOARD ── */
+function pageDash(){
+  if(!S.daily.length||!S.events.length)return noData();
+  const rows=filtered();
+  if(!rows.length)return noMatch();
+  if(S.curIdx<0||!S.events[S.curIdx])S.curIdx=pickCurrent();
+  const ev=S.events[S.curIdx];
+  const POOL=analysisPool();
+  const st=stats(POOL.rows);
+  if(!st)return noMatch();
+  const g=PCOL[ev.planet]||["#3B82F6","#6366F1"];
+  /* future events have no matched session yet — project one from the holiday calendar */
+  const TD_=(()=>{
+    if(ev.md)return ev.rule==="Same Day"
+      ? [ev.md,"SAME DAY","var(--up)","var(--upT)"]
+      : [ev.md,"ADJUSTED","var(--amb)","var(--ambT)"];
+    const[fd,fr]=futureDate(ev.date);
+    return fr==="Same Day"
+      ? [fd,"PROJECTED","var(--acc2)","var(--accT)"]
+      : [fd,"PROJECTED · "+fr.toUpperCase(),"var(--acc2)","var(--accT)"];
+  })();
+  const cand=Object.entries(st.candles).sort((a,b)=>b[1]-a[1]);
+  const top=cand[0]||["—",0];
+  const M=marketStats();
+
+  /* hero */
+  let h=scopeBar()+`<div class="hero">
+    <div class="orb" style="background:linear-gradient(140deg,${g[0]},${g[1]})">${GLYPH[ev.planet]||"✷"}</div>
+    <div>
+      <div class="lbl">${ev.date>=new Date()?"NEXT EVENT":"SELECTED EVENT"}</div>
+      <div class="nm">${esc(ev.name)}</div>
+      <div class="sm">${ev.cls==="Transit"
+        ? (ev.from?esc(ev.from)+" → "+esc(ev.raasi):esc(ev.raasi))+" · "+esc(ev.motion||"")
+        : esc(ev.deg+"° aspect")}</div>
+    </div>
+    <div class="hcell"><div class="k">EVENT DATE &amp; TIME</div>
+      <div class="v mono">${dstr(ev.date)}</div>
+      <div class="v mono" style="color:var(--dim)">${tstr(ev.time)}</div></div>
+    <div class="hcell"><div class="k">TRADING DAY</div>
+      <div><span class="tag" style="background:${TD_[3]};color:${TD_[2]}">${TD_[1]}</span></div>
+      <div class="v mono" style="margin-top:4px;color:var(--dim)">${dstr(TD_[0])}</div></div>
+    <div class="hcell"><div class="k">HISTORICAL MATCHES</div>
+      <div class="vb mono">${st.n.toLocaleString()}</div>
+      <div class="v" style="color:var(--dim2);font-size:10px">${esc(POOL.label)}</div></div>
+    <div class="hcell"><div class="k">CONFIDENCE</div>
+      <div>${stars(st.conf[1],st.conf[2])}</div>
+      <div style="margin-top:3px"><span class="tag" style="background:${st.conf[2]}22;color:${st.conf[2]}">${st.conf[0]}</span></div></div>
+  </div>`;
+
+  /* row 1 */
+  h+=`<div class="g23">
+    <div class="card"><h3>OPENING PROBABILITY</h3>
+      <div class="sub">Open against the previous close, beyond ±${S.set.gap}%</div>
+      ${bar("Gap Up",st.guP,"var(--up)")}
+      ${bar("Gap Down",st.gdP,"var(--dn)")}
+      ${bar("Flat",st.flP,"var(--amb)")}
+      <div class="mini">
+        <div><div class="k">Avg Gap Up</div><div class="v mono" style="color:var(--up)">${sg(st.guPts)}</div></div>
+        <div><div class="k">Avg Gap Down</div><div class="v mono" style="color:var(--dn)">${sg(st.gdPts)}</div></div>
+        <div><div class="k">Median Gap</div><div class="v mono" style="color:${col(st.medGapPts)}">${sg(st.medGapPts)}</div></div>
+      </div>
+      <div class="sl" style="margin-top:9px"><span class="k">vs market baseline</span>
+        <span class="v mono" style="color:${col(st.dGu)}">${sg1(st.dGu)} pp gap up</span></div>
+    </div>
+
+    <div class="card"><h3>CLOSING PROBABILITY</h3>
+      <div class="sub">Two independent readings of the same session</div>
+      <div class="split2">
+        <div>
+          <div class="h">Compared to Today's Open</div>
+          ${bar("Green",st.grnP,"var(--up)")}
+          ${bar("Red",st.redP,"var(--dn)")}
+          <div class="dn">${donut(st.grnP,"var(--up)",46)}
+            <div class="txt"><div class="k">Avg move from open</div>
+              <div class="v mono" style="color:${col(st.cvoAvg)}">${sg(st.cvoAvg)}%</div></div></div>
+        </div>
+        <div>
+          <div class="h">Compared to Yesterday's Close</div>
+          ${bar("Above",st.abvP,"var(--up)")}
+          ${bar("Below",st.blwP,"var(--dn)")}
+          <div class="dn">${donut(st.abvP,"var(--acc)",46)}
+            <div class="txt"><div class="k">Avg Return</div>
+              <div class="v mono" style="color:${col(st.retAvg)}">${sg(st.retAvg)}%</div></div></div>
+        </div>
+      </div>
+      <div class="sl" style="margin-top:10px"><span class="k">Δ green vs baseline</span>
+        <span class="v mono" style="color:${col(st.dGr)}">${sg1(st.dGr)} pp</span></div>
+      <div class="sl"><span class="k">Δ above prev close vs baseline</span>
+        <span class="v mono" style="color:${col(st.dAb)}">${sg1(st.dAb)} pp</span></div>
+    </div>
+
+    <div class="card"><h3>EXPECTED CANDLE</h3>
+      <div class="sub">Most frequent shape · body measured from ${basisLabel()}</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start">
+        <div style="text-align:center">
+          ${candleSVG(top[0],52,96)}
+          <div style="font-size:11.5px;font-weight:600;margin-top:6px">${esc(top[0])}</div>
+          <div class="mono" style="font-size:17px;font-weight:700;color:${BULLC.has(top[0])?"var(--up)":NEUTC.has(top[0])?"var(--amb)":"var(--dn)"}">
+            ${pc(top[1]/st.n*100)}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--dim2);margin-bottom:6px">OTHER POSSIBILITIES</div>
+          ${cand.slice(1,5).map(([k,v])=>`<div class="sl"><span class="k">${esc(k)}</span>
+            <span class="v mono">${pc(v/st.n*100)}</span></div>`).join("")}
+          <div class="sl" style="border-top:1px solid var(--line);margin-top:4px;padding-top:6px">
+            <span class="k">Bullish shapes</span>
+            <span class="v mono" style="color:var(--up)">${pc(st.D.filter(x=>BULLC.has(x.candle)).length/st.n*100)}</span></div>
+          <div class="sl"><span class="k">Bearish shapes</span>
+            <span class="v mono" style="color:var(--dn)">${pc(st.D.filter(x=>!BULLC.has(x.candle)&&!NEUTC.has(x.candle)).length/st.n*100)}</span></div>
+          <div class="sl"><span class="k">Indecision</span>
+            <span class="v mono" style="color:var(--amb)">${pc(st.D.filter(x=>NEUTC.has(x.candle)).length/st.n*100)}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  /* row 2 */
+  const rbins=[{r:[0,.5],l:"0.5%"},{r:[.5,1],l:"1%"},{r:[1,1.5],l:"1.5%"},{r:[1.5,2],l:"2%"},
+    {r:[2,2.5],l:"2.5%"},{r:[2.5,3],l:"3%"},{r:[3,4],l:"4%"},{r:[4,99],l:"4%+"}];
+  const rv=st.D.map(x=>x.rngPct);
+  let bestI=0,bc=0;
+  rbins.forEach((b,i)=>{const c=rv.filter(v=>v>=b.r[0]&&v<b.r[1]).length;if(c>bc){bc=c;bestI=i;}});
+  h+=`<div class="g23">
+    <div class="card"><h3>EXPECTED RANGE</h3>
+      <div class="sub">High to low as a share of close</div>
+      <div style="display:grid;grid-template-columns:104px 1fr;gap:12px">
+        <div>
+          <div class="sl"><span class="k">Average</span><span class="v mono" style="color:var(--pur)">${f2(st.rngAvg)}%</span></div>
+          <div class="sl"><span class="k">Median</span><span class="v mono">${f2(st.rngMed)}%</span></div>
+          <div class="sl"><span class="k">Max</span><span class="v mono">${f2(st.rngMax)}%</span></div>
+          <div class="sl"><span class="k">Min</span><span class="v mono">${f2(st.rngMin)}%</span></div>
+          <div class="sl"><span class="k">ATR</span><span class="v mono">${isNaN(st.atrAvg)?"—":f2(st.atrAvg)+"%"}</span></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:2px">
+            <span class="tag" style="background:var(--purT);color:var(--pur)">
+              Most likely ${rbins[bestI].r[0]}%–${rbins[bestI].r[1]>90?"+":rbins[bestI].r[1]+"%"}</span>
+          </div>
+          ${histogram(rv,rbins,null,(b,i)=>i===bestI?"var(--pur)":"var(--purS)")}
+        </div>
+      </div>
+    </div>
+
+    <div class="card"><h3>CLOSE POSITION</h3>
+      <div class="sub">Where the close sat inside the session's high–low</div>
+      <div class="cpwrap">
+        <div class="cpscale">
+          ${[100,75,50,25,0].map(t=>`<div class="tick" style="bottom:${t}%">${t}%</div>`).join("")}
+          <div class="mk" style="bottom:${Math.max(0,Math.min(100,st.cpAvg))}%"></div>
+        </div>
+        <div>
+          ${st.cpb.slice().reverse().map(b=>{
+            const p=b.n/st.n*100, isHi=b.nm.includes("High")||b.nm.includes("Upper");
+            return bar(b.nm,p,isHi?"var(--up)":b.nm==="Middle"?"var(--amb)":"var(--dn)");
+          }).join("")}
+          <div class="sl" style="margin-top:8px"><span class="k">Average close position</span>
+            <span class="v mono">${f1(st.cpAvg)} / 100</span></div>
+          <div class="sl"><span class="k">Body share of range</span>
+            <span class="v mono">${f1(st.bodyAvg)}%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card"><h3>EVENT CONTEXT</h3>
+      <div class="sub">Attributes of the selected event</div>
+      ${ev.cls==="Transit"?`
+        <div class="sl"><span class="k">Planet</span><span class="v">${GLYPH[ev.planet]||""} ${esc(ev.planet)}</span></div>
+        <div class="sl"><span class="k">From → To</span><span class="v">${esc(ev.from||"—")} → ${esc(ev.raasi)}</span></div>
+        <div class="sl"><span class="k">Rasi (western)</span><span class="v">${esc(RA_EN[ev.raasi]||"—")}</span></div>
+        <div class="sl"><span class="k">Motion</span><span class="v">
+          <span class="chp" style="background:${ev.motion&&ev.motion.includes("Retro")?"var(--dnT)":"var(--upT)"};
+          color:${ev.motion&&ev.motion.includes("Retro")?"var(--dn)":"var(--up)"}">${esc(ev.motion||"—")}</span></span></div>
+        <div class="sl"><span class="k">Element</span><span class="v">${esc(ELEM[ev.raasi]||"—")}</span></div>
+        <div class="sl"><span class="k">Nature</span><span class="v">${esc(NAT[ev.raasi]||"—")}</span></div>
+      `:`
+        <div class="sl"><span class="k">Pair</span><span class="v">${esc(ev.pair||"")}</span></div>
+        <div class="sl"><span class="k">Aspect</span><span class="v">${esc(ev.aspect)}</span></div>
+        <div class="sl"><span class="k">Separation</span><span class="v mono">${ev.deg}°</span></div>
+        <div class="sl"><span class="k">Nature</span><span class="v">${[0,60,120].includes(ev.deg)?"Soft":"Hard"}</span></div>
+      `}
+      <div class="sl"><span class="k">Clock band</span><span class="v">
+        <span class="chp" style="background:var(--accT);color:var(--acc2)">${esc(ev.band)}</span></span></div>
+      <div class="sl"><span class="k">Date rule</span><span class="v">${esc(ev.rule||"—")}</span></div>
+      <div style="margin-top:10px"><label style="font-size:10px;color:var(--dim2);display:block;margin-bottom:4px">JUMP TO EVENT</label>
+        <select id="evPick"></select></div>
+    </div>
+  </div>`;
+
+  /* row 3 */
+  const hb={
+    gap:{v:st.D.map(x=>x.gap),bins:[{r:[-99,-2],l:"<-2%"},{r:[-2,-1],l:"-2..-1"},{r:[-1,-S.set.gap],l:"-1..0"},
+      {r:[-S.set.gap,S.set.gap],l:"Flat"},{r:[S.set.gap,1],l:"0..1"},{r:[1,2],l:"1..2"},{r:[2,99],l:">2%"}],
+      c:b=>b.r[1]<=0?"var(--dn)":b.r[0]>=S.set.gap?"var(--up)":"var(--amb)"},
+    ret:{v:st.D.map(x=>x.cvpc),bins:[{r:[-99,-2],l:"<-2%"},{r:[-2,-1],l:"-2..-1"},{r:[-1,0],l:"-1..0"},
+      {r:[0,1],l:"0..1"},{r:[1,2],l:"1..2"},{r:[2,99],l:">2%"}],
+      c:b=>b.r[1]<=0?"var(--dn)":"var(--up)"},
+    rng:{v:rv,bins:rbins,c:"var(--pur)"},
+    cp:{v:st.D.map(x=>x.cp),bins:[{r:[0,20],l:"0-20"},{r:[20,40],l:"20-40"},{r:[40,60],l:"40-60"},
+      {r:[60,80],l:"60-80"},{r:[80,101],l:"80-100"}],
+      c:b=>b.r[0]>=60?"var(--up)":b.r[1]<=40?"var(--dn)":"var(--amb)"}
+  }[S.histTab];
+  const simRows=POOL.rows.slice(-8).reverse();
+  h+=`<div class="g23">
+    <div class="card"><h3>HISTORICAL DISTRIBUTION</h3>
+      <div class="sub">Spread of outcomes across all ${st.n} matches</div>
+      <div class="tabs">
+        ${[["gap","Gap %"],["ret","Return %"],["rng","Range %"],["cp","Close Position"]]
+          .map(([k,l])=>`<button class="${S.histTab===k?"on":""}" onclick="setTab('${k}')">${l}</button>`).join("")}
+      </div>
+      ${histogram(hb.v,hb.bins,null,hb.c)}
+    </div>
+
+    <div class="card"><h3>SIMILAR HISTORICAL EVENTS</h3>
+      <div class="sub">Most recent from: ${esc(POOL.label)}</div>
+      <div class="tw"><table>
+        <thead><tr><th>DATE</th><th>EVENT</th><th>GAP</th><th>CLOSE</th><th>CANDLE</th><th>RANGE</th><th>RETURN</th></tr></thead>
+        <tbody>${simRows.map(e=>{const d=dayOf(e);if(!d)return"";
+          const gt=d.gap>S.set.gap?["Gap Up","var(--up)"]:d.gap<-S.set.gap?["Gap Down","var(--dn)"]:["Flat","var(--amb)"];
+          return `<tr><td class="mono">${dstr(e.md)}</td><td>${esc(e.name)}</td>
+            <td><span class="chp" style="background:${gt[1]}22;color:${gt[1]}">${gt[0]}</span></td>
+            <td><span class="chp" style="background:${d.cvo>=0?"var(--upT)":"var(--dnT)"};
+              color:${d.cvo>=0?"var(--up)":"var(--dn)"}">${d.cvo>=0?"Green":"Red"}</span></td>
+            <td>${esc(d.candle)}</td><td class="mono">${f2(d.rngPct)}%</td>
+            <td class="mono" style="color:${col(d.cvpc)}">${sg(d.cvpc)}%</td></tr>`;}).join("")}
+        </tbody></table></div>
+    </div>
+
+    <div class="card"><h3>MARKET BASELINE COMPARISON</h3>
+      <div class="sub">Baseline is year-weighted to this sample's own year mix</div>
+      <div class="tw"><table>
+        <thead><tr><th>METRIC</th><th>THIS EVENT</th><th>MARKET</th><th>DIFF</th></tr></thead>
+        <tbody>${[
+          ["Gap Up %",st.guP,st.eGu,"pp"],["Gap Down %",st.gdP,st.eGd,"pp"],
+          ["Green (vs Open) %",st.grnP,st.eGr,"pp"],["Above Prev Close %",st.abvP,st.eAb,"pp"],
+          ["Avg Return %",st.retAvg,st.eRt,"%"],["Avg Range %",st.rngAvg,st.eRg,"%"]
+        ].map(([k,a,b,u])=>{const d=a-b;
+          return `<tr><td>${k}</td><td class="mono">${u==="pp"?pc(a):sg(a)+"%"}</td>
+            <td class="mono" style="color:var(--dim)">${u==="pp"?pc(b):sg(b)+"%"}</td>
+            <td class="mono" style="color:${col(d)}">${sg1(d)}${u==="pp"?" pp":"%"}</td></tr>`;}).join("")}
+        </tbody></table></div>
+      <div class="spec" style="margin-top:9px">The difference column is the answer. Raw percentages mostly
+        reflect which years the events fell in — Nifty's own gap-up rate has swung from 17% to 51% across eras.</div>
+    </div>
+  </div>`;
+  return h;
+}
+window.setTab=k=>{S.histTab=k;render();};
+window.setBasis=b=>{S.set.basis=b;applyBasis();save();render();};
+
+/* ── generic breakdown page ── */
+function breakdown(title,groups,keyFn,note){
+  if(!S.daily.length||!S.events.length)return noData();
+  const pool=analysisPool(), rows=pool.rows, bar_=scopeBar();
+  if(!rows.length)return noMatch();
+  const data=groups.map(g=>{
+    const sub=rows.filter(e=>keyFn(e)===g);
+    return{g,st:sub.length?stats(sub):null};
+  }).filter(x=>x.st);
+  if(!data.length)return noMatch();
+  const mx=Math.max(...data.map(d=>d.st.n));
+  return bar_+`<div class="card"><h3>${esc(title).toUpperCase()}</h3><div class="sub">${esc(note||"")}</div>
+    <div class="tw"><table>
+      <thead><tr><th>GROUP</th><th>N</th><th>CONF</th><th>GAP UP</th><th>Δ</th><th>GAP DOWN</th>
+        <th>FLAT</th><th>GREEN</th><th>Δ</th><th>ABOVE PC</th><th>AVG RET</th><th>Δ RET</th>
+        <th>AVG RANGE</th><th>CLOSE POS</th><th>TOP CANDLE</th></tr></thead>
+      <tbody>${data.map(({g,st})=>{
+        const tc=Object.entries(st.candles).sort((a,b)=>b[1]-a[1])[0];
+        return `<tr><td style="font-weight:600">${esc(g)}</td>
+          <td class="mono">${st.n}</td>
+          <td><span class="chp" style="background:${st.conf[2]}22;color:${st.conf[2]}">${st.conf[0]}</span></td>
+          <td class="mono">${pc(st.guP)}</td>
+          <td class="mono" style="color:${col(st.dGu)}">${sg1(st.dGu)}</td>
+          <td class="mono">${pc(st.gdP)}</td><td class="mono">${pc(st.flP)}</td>
+          <td class="mono">${pc(st.grnP)}</td>
+          <td class="mono" style="color:${col(st.dGr)}">${sg1(st.dGr)}</td>
+          <td class="mono">${pc(st.abvP)}</td>
+          <td class="mono" style="color:${col(st.retAvg)}">${sg(st.retAvg)}%</td>
+          <td class="mono" style="color:${col(st.dRt)}">${sg(st.dRt)}</td>
+          <td class="mono">${f2(st.rngAvg)}%</td><td class="mono">${f1(st.cpAvg)}</td>
+          <td>${tc?esc(tc[0])+" "+pc(tc[1]/st.n*100):"—"}</td></tr>`;}).join("")}
+      </tbody></table></div>
+    <div class="spec" style="margin-top:10px">Δ columns compare each group against the market over that
+      group's own year mix. Anything inside roughly ±2 pp is ordinary variation. Read N first — a group
+      under 20 events cannot support a percentage.</div>
+  </div>
+  <div class="card"><h3>SAMPLE SIZE</h3><div class="sub">Relative weight of each group</div>
+    ${data.slice().sort((a,b)=>b.st.n-a.st.n).map(({g,st})=>
+      bar(g,st.n/mx*100,st.conf[2],st.n)).join("")}
+  </div>`;
+}
+
+/* ── UPCOMING ── */
+function pageUpcoming(){
+  if(!S.events.length)return noData();
+  /* When frozen, "upcoming" means everything after the cutoff — the sessions the
+     engine has not been allowed to see. Otherwise it means genuinely future. */
+  const now=S.asof?new Date(S.asof):(()=>{const d=new Date();d.setHours(0,0,0,0);return d;})();
+  const up=S.events.filter(e=>e.date>now).slice(0,120);
+  if(!up.length)return `<div class="empty"><div class="ic">◲</div><h3>No future events in your data</h3>
+    <p>Your planetary tables end before today. Load a file that extends past ${dstr(now)}.</p>
+    <button class="btn" onclick="go('data')">Open Data Center</button></div>`;
+  const lastD=S.daily.length?S.daily[S.daily.length-1].d:null;
+  return `<div class="card"><h3>UPCOMING EVENTS</h3>
+    ${S.asof?`<div class="spec" style="margin-bottom:10px">Engine frozen at
+      <b style="color:var(--amb)">${dstr(S.asof)}</b>. These are the events it has not seen —
+      the probabilities come from pre-cutoff history only. Score them on
+      <b style="color:var(--acc2)">History Verify</b>.</div>`:""}
+    <div class="sub">${up.length} ahead · trading date adjusted for weekends${S.set.holidays.length?" and "+S.set.holidays.length+" holidays":" (add exchange holidays in Settings for full accuracy)"}</div>
+    <div class="tw"><table>
+      <thead><tr><th>EVENT DATE</th><th>TIME</th><th>EVENT</th><th>CLOCK BAND</th><th>TRADING DATE</th>
+        <th>RULE</th><th>SHIFT</th><th>N</th><th>CONF</th><th>GAP UP</th><th>GREEN</th><th>Δ GREEN</th></tr></thead>
+      <tbody>${up.map(e=>{
+        const[md,rule,shift]=futureDate(e.date);
+        const sim=similar(e);
+        const pool=sim.length>=20?sim:(e.cls==="Transit"
+          ? S.events.filter(x=>x.valid&&x.cls==="Transit"&&x.planet===e.planet)
+          : S.events.filter(x=>x.valid&&x.cls==="Aspect"&&x.aspect===e.aspect));
+        const st=pool.length?stats(pool):null;
+        return `<tr><td class="mono">${dstr(e.date)}</td>
+          <td class="mono">${tstr(e.time)}</td>
+          <td style="font-weight:600">${esc(e.name)}</td>
+          <td><span class="chp" style="background:var(--accT);color:var(--acc2)">${esc(e.band)}</span></td>
+          <td class="mono">${dstr(md)}</td>
+          <td><span class="chp" style="background:${rule==="Same Day"?"var(--upT)":"var(--ambT)"};
+            color:${rule==="Same Day"?"var(--up)":"var(--amb)"}">${rule}</span></td>
+          <td class="mono">${shift>0?"+"+shift:shift}d</td>
+          <td class="mono">${st?st.n:"—"}</td>
+          <td>${st?`<span class="chp" style="background:${st.conf[2]}22;color:${st.conf[2]}">${st.conf[0]}</span>`:"—"}</td>
+          <td class="mono">${st?pc(st.guP):"—"}</td>
+          <td class="mono">${st?pc(st.grnP):"—"}</td>
+          <td class="mono" style="color:${st?col(st.dGr):"var(--dim)"}">${st?sg1(st.dGr):"—"}</td></tr>`;}).join("")}
+      </tbody></table></div>
+    ${lastD?`<div class="spec" style="margin-top:10px">Your Nifty history ends ${dstr(lastD)}. Events after
+      that date have no market data yet — the probabilities shown come from past occurrences of the same
+      event, so they are context, not a prediction.</div>`:""}
+  </div>`;
+}
+function futureDate(d){
+  const isT=x=>{
+    if(x.getDay()===0||x.getDay()===6)return false;
+    return !S.set.holidays.some(h=>key(h)===key(x));
+  };
+  const d0=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  if(isT(d0))return[d0,"Same Day",0];
+  const p=new Date(d0);p.setDate(p.getDate()-1);
+  if(isT(p))return[p,"Previous Day",-1];
+  const n=new Date(d0);let k=0;
+  while(k<15){n.setDate(n.getDate()+1);k++;if(isT(n))return[new Date(n),"Next Day",k];}
+  return[d0,"Same Day",0];
+}
+
+/* ── CANDLE ── */
+function pageCandle(){
+  if(!S.daily.length||!S.events.length)return noData();
+  const pool=analysisPool(), rows=pool.rows; if(!rows.length)return noMatch();
+  const st=stats(rows); const M=marketStats();
+  const mc={};S.daily.forEach(x=>mc[x.candle]=(mc[x.candle]||0)+1);
+  const list=CANDLES.filter(c=>st.candles[c]||mc[c]);
+  const mx=Math.max(...list.map(c=>(st.candles[c]||0)/st.n*100));
+  const other=S.set.basis==="prev"?"open":"prev";
+  return scopeBar()+`<div class="card"><h3>CANDLE PROBABILITY</h3>
+    <div class="sub">${st.n} events${pool.kind!=="filter"?" · "+esc(pool.label):""},
+      against ${M.n.toLocaleString()} market sessions · body measured from <b style="color:var(--acc2)">${basisLabel()}</b>
+      <button class="btn ghost" style="padding:2px 8px;font-size:10.5px;margin-left:6px"
+        onclick="setBasis('${other}')">switch to ${other==="prev"?"previous close":"today's open"}</button></div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>CANDLE</th><th>COUNT</th><th>THIS SET</th><th>MARKET</th><th>DIFF</th><th></th></tr></thead>
+      <tbody>${list.map(c=>{
+        const a=(st.candles[c]||0)/st.n*100, b=(mc[c]||0)/M.n*100, d=a-b;
+        const cc=BULLC.has(c)?"var(--up)":NEUTC.has(c)?"var(--amb)":"var(--dn)";
+        return `<tr><td style="width:34px">${candleSVG(c,22,38)}</td>
+          <td style="font-weight:600">${esc(c)}</td>
+          <td class="mono">${st.candles[c]||0}</td>
+          <td class="mono" style="color:${cc}">${pc(a)}</td>
+          <td class="mono" style="color:var(--dim)">${pc(b)}</td>
+          <td class="mono" style="color:${col(d)}">${sg1(d)} pp</td>
+          <td style="width:150px"><span class="t" style="display:block;height:10px;background:var(--card3);border-radius:3px;overflow:hidden">
+            <i style="display:block;height:100%;width:${a/mx*100}%;background:${cc};border-radius:3px"></i></span></td></tr>`;}).join("")}
+      </tbody></table></div>
+  </div>
+  ${breakdownCandleByPlanet()}`;
+}
+function breakdownCandleByPlanet(){
+  const rows=analysisPool().rows;
+  const planets=[...new Set(rows.filter(e=>e.cls==="Transit").map(e=>e.planet))];
+  if(!planets.length)return "";
+  return `<div class="card"><h3>DOMINANT CANDLE BY PLANET</h3>
+    <div class="sub">Bullish, bearish and indecision share of each planet's transits</div>
+    ${planets.map(p=>{
+      const st=stats(rows.filter(e=>e.planet===p&&e.cls==="Transit")); if(!st)return "";
+      const bu=st.D.filter(x=>BULLC.has(x.candle)).length/st.n*100;
+      const ne=st.D.filter(x=>NEUTC.has(x.candle)).length/st.n*100;
+      const be=100-bu-ne;
+      return `<div style="margin-bottom:11px">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px">
+          <span style="font-weight:600">${GLYPH[p]||""} ${esc(p)}</span>
+          <span class="mono" style="color:var(--dim)">n=${st.n}</span></div>
+        <div style="display:flex;height:19px;border-radius:5px;overflow:hidden;border:1px solid var(--line)">
+          <div style="flex:${bu};background:var(--up);display:flex;align-items:center;justify-content:center;
+            font-size:10px;font-weight:700;color:var(--onUp)">${bu>11?bu.toFixed(0)+"%":""}</div>
+          <div style="flex:${ne};background:var(--amb);display:flex;align-items:center;justify-content:center;
+            font-size:10px;font-weight:700;color:var(--onAmb)">${ne>11?ne.toFixed(0)+"%":""}</div>
+          <div style="flex:${be};background:var(--dn);display:flex;align-items:center;justify-content:center;
+            font-size:10px;font-weight:700;color:var(--onDn)">${be>11?be.toFixed(0)+"%":""}</div>
+        </div></div>`;}).join("")}
+    <div style="display:flex;gap:14px;font-size:11px;color:var(--dim);margin-top:4px">
+      <span><span class="dot" style="background:var(--up)"></span>Bullish</span>
+      <span><span class="dot" style="background:var(--amb)"></span>Indecision</span>
+      <span><span class="dot" style="background:var(--dn)"></span>Bearish</span></div>
+  </div>`;
+}
+
+/* ── RANGE ── */
+function pageRange(){
+  if(!S.daily.length||!S.events.length)return noData();
+  const pool=analysisPool(), rows=pool.rows; if(!rows.length)return noMatch();
+  const st=stats(rows),M=marketStats();
+  const rv=st.D.map(x=>x.rngPct).sort((a,b)=>a-b);
+  const q=p=>rv[Math.min(rv.length-1,Math.floor(p*rv.length))];
+  const rbins=[{r:[0,.5],l:"<0.5"},{r:[.5,1],l:"0.5-1"},{r:[1,1.5],l:"1-1.5"},{r:[1.5,2],l:"1.5-2"},
+    {r:[2,2.5],l:"2-2.5"},{r:[2.5,3],l:"2.5-3"},{r:[3,4],l:"3-4"},{r:[4,99],l:"4+"}];
+  return scopeBar()+`<div class="g2">
+    <div class="card"><h3>RANGE DISTRIBUTION</h3>
+      <div class="sub">${st.n} events${pool.kind==="event"?" of "+esc(pool.label):""} · high-to-low as % of close</div>
+      ${histogram(st.D.map(x=>x.rngPct),rbins,null,"var(--pur)")}
+      <div class="mini" style="grid-template-columns:repeat(4,1fr)">
+        <div><div class="k">p25</div><div class="v mono">${f2(q(.25))}%</div></div>
+        <div><div class="k">Median</div><div class="v mono">${f2(q(.5))}%</div></div>
+        <div><div class="k">p75</div><div class="v mono">${f2(q(.75))}%</div></div>
+        <div><div class="k">p90</div><div class="v mono">${f2(q(.9))}%</div></div>
+      </div>
+    </div>
+    <div class="card"><h3>ANATOMY OF THE CANDLE</h3>
+      <div class="sub">How the range splits into body and wicks · from ${basisLabel()}</div>
+      <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px">
+        <div style="flex:${st.upwAvg};background:var(--cy);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--onCy)">${st.upwAvg>10?f1(st.upwAvg)+"%":""}</div>
+        <div style="flex:${st.bodyAvg};background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${f1(st.bodyAvg)}%</div>
+        <div style="flex:${st.lowAvg};background:var(--pur);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--onPur)">${st.lowAvg>10?f1(st.lowAvg)+"%":""}</div>
+      </div>
+      <div class="sl"><span class="k"><span class="dot" style="background:var(--cy)"></span>Upper wick</span><span class="v mono">${f1(st.upwAvg)}%</span></div>
+      <div class="sl"><span class="k"><span class="dot" style="background:var(--acc)"></span>Body</span><span class="v mono">${f1(st.bodyAvg)}%</span></div>
+      <div class="sl"><span class="k"><span class="dot" style="background:var(--pur)"></span>Lower wick</span><span class="v mono">${f1(st.lowAvg)}%</span></div>
+      <div class="sl"><span class="k">Average range</span><span class="v mono">${f2(st.rngAvg)}% <span style="color:${col(st.dRg)}">(${sg(st.dRg)})</span></span></div>
+      <div class="sl"><span class="k">Market average range</span><span class="v mono" style="color:var(--dim)">${f2(M.rngAvg)}%</span></div>
+      <div class="sl"><span class="k">Average ATR</span><span class="v mono">${isNaN(st.atrAvg)?"—":f2(st.atrAvg)+"%"}</span></div>
+    </div>
+  </div>
+  <div class="card"><h3>CLOSE POSITION BANDS</h3>
+    <div class="sub">Share of events finishing in each part of the day's range</div>
+    ${st.cpb.slice().reverse().map(b=>{
+      const p=b.n/st.n*100, isHi=b.nm.includes("High")||b.nm.includes("Upper");
+      return bar(b.nm,p,isHi?"var(--up)":b.nm==="Middle"?"var(--amb)":"var(--dn)",b.n+" · "+pc(p));
+    }).join("")}
+    <div class="sl" style="margin-top:8px"><span class="k">Average close position</span>
+      <span class="v mono">${f1(st.cpAvg)} / 100 <span style="color:${col(st.cpAvg-M.cpAvg)}">(${sg1(st.cpAvg-M.cpAvg)} vs market)</span></span></div>
+  </div>`;
+}
+
+/* ── HISTORICAL EVENTS ── */
+let histQ="";
+function pageHist(){
+  if(!S.events.length)return noData();
+  const pool=analysisPool();
+  let rows=pool.rows;
+  if(histQ){const q=histQ.toLowerCase();rows=rows.filter(e=>e.name.toLowerCase().includes(q));}
+  const show=rows.slice(-400).reverse();
+  return scopeBar()+`<div class="card">
+    <div style="display:flex;gap:9px;align-items:center;margin-bottom:11px;flex-wrap:wrap">
+      <h3 style="margin:0">MATCHED EVENTS</h3>
+      <span class="pill">${rows.length.toLocaleString()} events</span>
+      <input id="hq" placeholder="Search event name…" value="${esc(histQ)}"
+        style="margin-left:auto;background:var(--card2);border:1px solid var(--line);border-radius:7px;
+        padding:7px 10px;font-size:12px;min-width:180px">
+      <button class="btn ghost" onclick="exportCSV()">Export CSV</button>
+    </div>
+    <div class="tw" style="max-height:66vh;overflow-y:auto"><table>
+      <thead><tr><th>EVENT DATE</th><th>TRADING DATE</th><th>RULE</th><th>EVENT</th><th>CLASS</th>
+        <th>MOTION</th><th>BAND</th><th>GAP %</th><th>OPEN→CLOSE</th><th>vs PREV</th>
+        <th>CANDLE</th><th>RANGE %</th><th>CLOSE POS</th></tr></thead>
+      <tbody>${show.map(e=>{const d=dayOf(e);if(!d)return"";
+        return `<tr><td class="mono">${dstr(e.date)}</td><td class="mono">${dstr(e.md)}</td>
+          <td><span class="chp" style="background:${e.rule==="Same Day"?"var(--upT)":"var(--ambT)"};
+            color:${e.rule==="Same Day"?"var(--up)":"var(--amb)"}">${esc(e.rule)}</span></td>
+          <td style="font-weight:600">${esc(e.name)}</td><td>${esc(e.cls)}</td>
+          <td>${esc(e.motion||"—")}</td><td>${esc(e.band)}</td>
+          <td class="mono" style="color:${col(d.gap)}">${sg(d.gap)}</td>
+          <td class="mono" style="color:${col(d.cvo)}">${sg(d.cvo)}</td>
+          <td class="mono" style="color:${col(d.cvpc)}">${sg(d.cvpc)}</td>
+          <td>${esc(d.candle)}</td><td class="mono">${f2(d.rngPct)}</td>
+          <td class="mono">${f1(d.cp)}</td></tr>`;}).join("")}
+      </tbody></table></div>
+    ${rows.length>400?`<div class="spec" style="margin-top:9px">Showing the most recent 400 of
+      ${rows.length.toLocaleString()}. Export the CSV for the full set.</div>`:""}
+  </div>`;
+}
+window.exportCSV=()=>{
+  const rows=analysisPool().rows;
+  const head=["EventDate","TradingDate","Rule","Event","Class","Planet","Raasi","FromRaasi","Aspect",
+    "Motion","Band","GapPct","GapPts","CvO","CvPC","Candle","RangePct","BodyPct","ClosePos"];
+  const lines=[head.join(",")];
+  rows.forEach(e=>{const d=dayOf(e);if(!d)return;
+    lines.push([iso(e.date),iso(e.md),e.rule,
+      '"'+e.name+'"',e.cls,e.planet||"",e.raasi||"",e.from||"",e.aspect||"",e.motion||"",e.band,
+      f2(d.gap),f2(d.gapPts),f2(d.cvo),f2(d.cvpc),d.candle,f2(d.rngPct),f1(d.body),f1(d.cp)].join(","));
+  });
+  const b=new Blob([lines.join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download="astro_nifty_events.csv";a.click();URL.revokeObjectURL(a.href);
+};
+
+/* ── HISTORY VERIFY · walk-forward ── */
+function forwardTest(){
+  const ck=cutKey(); if(ck===Infinity)return null;
+  const fwd=S.events.filter(e=>e.valid&&key(e.md)>ck).sort((a,b)=>a.md-b.md);
+  if(!fwd.length)return{fwd:[],rows:[]};
+  const pre=S.events.filter(e=>e.valid&&key(e.md)<=ck);
+  const rows=fwd.map(e=>{
+    /* the pool is built ONLY from events that had already happened */
+    let pool=e.cls==="Transit"
+      ? pre.filter(x=>x.cls==="Transit"&&x.planet===e.planet&&x.raasi===e.raasi)
+      : pre.filter(x=>x.cls==="Aspect"&&x.pair===e.pair&&x.aspect===e.aspect);
+    let scope="exact";
+    if(pool.length<20){
+      pool=e.cls==="Transit"?pre.filter(x=>x.cls==="Transit"&&x.planet===e.planet)
+                            :pre.filter(x=>x.cls==="Aspect"&&x.aspect===e.aspect);
+      scope="broad";
+    }
+    if(pool.length<20){pool=pre.filter(x=>x.cls===e.cls);scope="class";}
+    if(!pool.length)return null;
+    const D=pool.map(dayOf).filter(Boolean); if(!D.length)return null;
+    const n=D.length, T=S.set.gap;
+    const grn=D.filter(x=>x.cvo>=0).length/n*100;
+    const gu=D.filter(x=>x.gap>T).length/n*100, gd=D.filter(x=>x.gap<-T).length/n*100;
+    const cc={};D.forEach(x=>cc[x.candle]=(cc[x.candle]||0)+1);
+    const topC=Object.entries(cc).sort((a,b)=>b[1]-a[1])[0][0];
+    const act=dayOf(e); if(!act)return null;
+    const pDir=grn>=50?"Green":"Red";
+    const aDir=act.cvo>=0?"Green":"Red";
+    const pGap=gu>gd&&gu>(100-gu-gd)?"Gap Up":gd>gu&&gd>(100-gu-gd)?"Gap Down":"Flat";
+    const aGap=act.gap>T?"Gap Up":act.gap<-T?"Gap Down":"Flat";
+    return{e,n,scope,conf:confOf(n),grn,pDir,aDir,dirHit:pDir===aDir,
+      pGap,aGap,gapHit:pGap===aGap,topC,aC:act.candle,candHit:topC===act.candle,act};
+  }).filter(Boolean);
+  return{fwd,rows};
+}
+function pageVerify(){
+  if(!S.daily.length||!S.events.length)return noData();
+  const lo=S.daily[0].d, hi=S.daily[S.daily.length-1].d;
+  const head=`<div class="card"><h3>HISTORY VERIFY · WALK-FORWARD</h3>
+    <div class="sub">Freeze the engine at a past date, then score it on sessions it has never seen</div>
+    <div style="display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-bottom:11px">
+      <div class="fgrp" style="margin:0"><label>Engine may see data up to</label>
+        <input type="date" id="asofIn" value="${S.asof?iso(S.asof):""}"
+          min="${iso(lo)}" max="${iso(hi)}"
+          style="background:var(--card2);border:1px solid var(--line);border-radius:7px;
+          padding:7px 9px;font-size:12px;color-scheme:${S.set.theme==="light"?"light":"dark"}"></div>
+      <button class="btn" onclick="setAsof()">Freeze here</button>
+      ${S.asof?`<button class="btn ghost" onclick="clearAsof()">Release · use all data</button>`:""}
+      ${!S.asof?`<button class="btn ghost" onclick="quickAsof(0.7)">Freeze at 70% of history</button>`:""}
+    </div>
+    ${S.asof?"":`<div class="spec">Nothing is frozen, so every page is using all
+      ${S.daily.length.toLocaleString()} sessions. Pick a date above to run a forward test.</div>`}
+  </div>`;
+  if(!S.asof)return head+`<div class="card"><h3>WHY THIS EXISTS</h3>
+    <div class="sub">The failure mode it is built to catch</div>
+    <div class="g2"><div>
+      <div class="sl"><span class="k">The mistake</span><span class="v">Fitting on all history, then admiring the fit</span></div>
+      <div class="sl"><span class="k">Why it flatters</span><span class="v">Every event helped set the average it is judged against</span></div>
+      <div class="sl"><span class="k">What this does</span><span class="v">Hides everything after a date, predicts forward, scores it</span></div>
+      <div class="sl"><span class="k">The number that matters</span><span class="v">Hit rate minus the base rate</span></div>
+    </div><div class="spec" style="margin:0">
+      A 52% hit rate sounds like an edge until you notice the market closed green
+      49% of the time anyway — then it is worth three points, and three points on a
+      few hundred calls is inside what luck produces. The scorecard prints the base
+      rate next to every hit rate so the comparison is unavoidable.
+    </div></div></div>`;
+
+  const R=forwardTest();
+  if(!R||!R.rows.length)return head+`<div class="empty"><div class="ic">◷</div>
+    <h3>No sessions left to test</h3><p>The cutoff is at or past the end of your data.
+    Move it earlier so there is something held back.</p></div>`;
+
+  const rows=R.rows, n=rows.length;
+  const strong=rows.filter(r=>r.n>=100);
+  const preN=S.events.filter(e=>e.valid&&key(e.md)<=cutKey()).length;
+  const preD=visDaily().length;
+
+  const card=(title,sel,label)=>{
+    const hits=sel.filter(r=>r[label.k]).length, hr=hits/sel.length*100;
+    const base=label.base(sel);
+    const edge=hr-base;
+    return `<div class="card"><h3>${title}</h3><div class="sub">${label.sub}</div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span style="font-size:31px;font-weight:700;letter-spacing:-.02em;color:${col(edge)}">${f1(hr)}%</span>
+        <span style="font-size:11.5px;color:var(--dim)">${hits} of ${sel.length} calls</span>
+      </div>
+      <div class="sl" style="margin-top:7px"><span class="k">Base rate — always call the majority</span>
+        <span class="v mono">${f1(base)}%</span></div>
+      <div class="sl"><span class="k">Edge over that</span>
+        <span class="v mono" style="color:${col(edge)}">${sg1(edge)} pp</span></div>
+      <div class="sl"><span class="k">Verdict</span><span class="v">${
+        Math.abs(edge)<2?'<span class="chp" style="background:var(--ambT);color:var(--amb)">INSIDE NOISE</span>'
+        :edge>0?'<span class="chp" style="background:var(--upT);color:var(--up)">BEATS BASE RATE</span>'
+        :'<span class="chp" style="background:var(--dnT);color:var(--dn)">WORSE THAN BASE RATE</span>'}</span></div>
+    </div>`;};
+
+  const dirBase=sel=>{const g=sel.filter(r=>r.aDir==="Green").length/sel.length*100;return Math.max(g,100-g);};
+  const gapBase=sel=>{const c={};sel.forEach(r=>c[r.aGap]=(c[r.aGap]||0)+1);
+    return Math.max(...Object.values(c))/sel.length*100;};
+  const canBase=sel=>{const c={};sel.forEach(r=>c[r.aC]=(c[r.aC]||0)+1);
+    return Math.max(...Object.values(c))/sel.length*100;};
+
+  return head+`
+  <div class="card" style="padding:11px 13px">
+    <div class="g2">
+      <div>
+        <div class="sl"><span class="k">Engine sees</span><span class="v mono">${dstr(lo)} → ${dstr(S.asof)}</span></div>
+        <div class="sl"><span class="k">Sessions available to it</span><span class="v mono">${preD.toLocaleString()}</span></div>
+        <div class="sl"><span class="k">Events it has learned from</span><span class="v mono">${preN.toLocaleString()}</span></div>
+      </div>
+      <div>
+        <div class="sl"><span class="k">Held back</span><span class="v mono">${dstr(S.asof)} → ${dstr(hi)}</span></div>
+        <div class="sl"><span class="k">Forward events scored</span><span class="v mono">${n.toLocaleString()}</span></div>
+        <div class="sl"><span class="k">…of those with a 100+ event pool</span><span class="v mono">${strong.length.toLocaleString()}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="g3">
+    ${card("DIRECTION CALL",rows,{k:"dirHit",base:dirBase,
+      sub:"Predicted green or red against today's open"})}
+    ${card("GAP CALL",rows,{k:"gapHit",base:gapBase,
+      sub:"Predicted gap up, gap down or flat"})}
+    ${card("CANDLE CALL",rows,{k:"candHit",base:canBase,
+      sub:"Predicted the single most likely candle"})}
+  </div>
+  ${strong.length>=20?`<div class="g3">
+    ${card("DIRECTION · HIGH-CONFIDENCE ONLY",strong,{k:"dirHit",base:dirBase,
+      sub:"Restricted to calls backed by 100+ past events"})}
+    ${card("GAP · HIGH-CONFIDENCE ONLY",strong,{k:"gapHit",base:gapBase,
+      sub:"Restricted to calls backed by 100+ past events"})}
+    ${card("CANDLE · HIGH-CONFIDENCE ONLY",strong,{k:"candHit",base:canBase,
+      sub:"Restricted to calls backed by 100+ past events"})}
+  </div>`:""}
+  <div class="card"><h3>EVERY FORWARD CALL</h3>
+    <div class="sub">Predictions made with pre-cutoff data only, next to what the session actually did</div>
+    <div class="tw" style="max-height:56vh;overflow-y:auto"><table>
+      <thead><tr><th>TRADING DATE</th><th>EVENT</th><th>POOL</th><th>N</th><th>CONF</th>
+        <th>PRED DIR</th><th>ACTUAL</th><th>✓</th><th>PRED GAP</th><th>ACTUAL</th><th>✓</th>
+        <th>PRED CANDLE</th><th>ACTUAL</th><th>✓</th><th>RETURN</th></tr></thead>
+      <tbody>${rows.slice(0,400).map(r=>{
+        const tick=b=>b?'<span style="color:var(--up)">✓</span>':'<span style="color:var(--dn)">✗</span>';
+        return `<tr><td class="mono">${dstr(r.e.md)}</td>
+          <td style="font-weight:600">${esc(r.e.name)}</td>
+          <td><span class="chp" style="background:var(--accT);color:var(--acc2)">${r.scope}</span></td>
+          <td class="mono">${r.n}</td>
+          <td><span class="chp" style="background:${r.conf[2]}22;color:${r.conf[2]}">${r.conf[0]}</span></td>
+          <td style="color:${r.pDir==="Green"?"var(--up)":"var(--dn)"}">${r.pDir}</td>
+          <td style="color:${r.aDir==="Green"?"var(--up)":"var(--dn)"}">${r.aDir}</td>
+          <td>${tick(r.dirHit)}</td>
+          <td>${r.pGap}</td><td>${r.aGap}</td><td>${tick(r.gapHit)}</td>
+          <td style="font-size:11px">${esc(r.topC)}</td>
+          <td style="font-size:11px">${esc(r.aC)}</td><td>${tick(r.candHit)}</td>
+          <td class="mono" style="color:${col(r.act.cvpc)}">${sg(r.act.cvpc)}%</td></tr>`;}).join("")}
+      </tbody></table></div>
+    ${n>400?`<div class="spec" style="margin-top:9px">Showing the first 400 of ${n.toLocaleString()};
+      the scorecards above use all of them.</div>`:""}
+  </div>`;
+}
+window.setAsof=()=>{const v=$("asofIn");if(!v||!v.value)return;
+  S.asof=parseDate(v.value); applyBasis(); S.curIdx=pickCurrent(); save(); render();};
+window.clearAsof=()=>{S.asof=null; applyBasis(); S.curIdx=pickCurrent(); save(); render();};
+window.quickAsof=frac=>{const d=S.daily; if(!d.length)return;
+  S.asof=new Date(d[Math.floor(d.length*frac)].d); applyBasis(); S.curIdx=pickCurrent(); save(); render();};
+
+/* ── MARKET BASELINE ── */
+function pageBase(){
+  if(!S.daily.length)return noData();
+  const M=marketStats(),D=S.daily;
+  const cc={};D.forEach(x=>cc[x.candle]=(cc[x.candle]||0)+1);
+  const yrs=Object.keys(S.ybase).map(Number).sort((a,b)=>a-b);
+  return `<div class="g2">
+    <div class="card"><h3>MARKET BASELINE</h3>
+      <div class="sub">All ${M.n.toLocaleString()} sessions · ${dstr(D[0].d)} to ${dstr(D[D.length-1].d)}</div>
+      ${bar("Gap Up",M.guP,"var(--up)")}${bar("Gap Down",M.gdP,"var(--dn)")}${bar("Flat",M.flP,"var(--amb)")}
+      <div class="sl" style="margin-top:9px"><span class="k">Green vs open</span><span class="v mono">${pc(M.grnP)}</span></div>
+      <div class="sl"><span class="k">Above previous close</span><span class="v mono">${pc(M.abvP)}</span></div>
+      <div class="sl"><span class="k">Average return</span><span class="v mono" style="color:${col(M.retAvg)}">${sg(M.retAvg)}%</span></div>
+      <div class="sl"><span class="k">Average range</span><span class="v mono">${f2(M.rngAvg)}%</span></div>
+      <div class="sl"><span class="k">Average body share</span><span class="v mono">${f1(M.bodyAvg)}%</span></div>
+      <div class="sl"><span class="k">Average close position</span><span class="v mono">${f1(M.cpAvg)} / 100</span></div>
+      <div class="sl"><span class="k">Average gap up / down</span><span class="v mono">${sg(M.guPts)} / ${sg(M.gdPts)} pts</span></div>
+    </div>
+    <div class="card"><h3>CANDLE MIX — ALL SESSIONS</h3>
+      <div class="sub">The reference distribution every event group is judged against</div>
+      ${CANDLES.filter(c=>cc[c]).sort((a,b)=>cc[b]-cc[a]).map(c=>{
+        const p=cc[c]/M.n*100;
+        return bar(c,p/Math.max(...Object.values(cc))*M.n/M.n*100*(Math.max(...Object.values(cc))/M.n*100?1:1),
+          BULLC.has(c)?"var(--up)":NEUTC.has(c)?"var(--amb)":"var(--dn)",pc(p));
+      }).join("")}
+    </div>
+  </div>
+  <div class="card"><h3>BASELINE BY YEAR</h3>
+    <div class="sub">This is why raw percentages mislead — the market's own behaviour is not stable</div>
+    <div class="tw"><table>
+      <thead><tr><th>YEAR</th><th>SESSIONS</th><th>GAP UP %</th><th>GAP DOWN %</th><th>GREEN %</th>
+        <th>ABOVE PC %</th><th>AVG RETURN %</th><th>AVG RANGE %</th><th>CLOSE POS</th></tr></thead>
+      <tbody>${yrs.map(y=>{const b=S.ybase[y];
+        return `<tr><td class="mono" style="font-weight:600">${y}</td><td class="mono">${b.n}</td>
+          <td class="mono">${pc(b.gu*100)}</td><td class="mono">${pc(b.gd*100)}</td>
+          <td class="mono">${pc(b.gr*100)}</td><td class="mono">${pc(b.ab*100)}</td>
+          <td class="mono" style="color:${col(b.ret)}">${sg(b.ret)}</td>
+          <td class="mono">${f2(b.rng)}</td><td class="mono">${f1(b.cp)}</td></tr>`;}).join("")}
+      </tbody></table></div>
+  </div>`;
+}
+
+/* ── DATA CENTER ── */
+function pageData(){
+  const box=(id,title,desc,cols,count,eg)=>`
+    <div class="card"><h3>${title}</h3><div class="sub">${desc}</div>
+      <div class="drop" id="drop_${id}">
+        <div class="ic">${count?"✓":"⇪"}</div>
+        <div class="t" style="color:${count?"var(--up)":"var(--txt)"}">${count?count.toLocaleString()+" rows loaded":"Drop a file or click to browse"}</div>
+        <div class="s">.xlsx · .xls · .csv</div>
+        <input type="file" id="file_${id}" accept=".xlsx,.xls,.csv" class="hide">
+      </div>
+      <div class="spec">Needs <code>${cols}</code><br><span style="color:var(--dim2)">Example: ${eg}</span></div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:11.5px;color:var(--dim)">Or paste rows</summary>
+        <textarea id="paste_${id}" placeholder="Paste with a header row (tab or comma separated)"></textarea>
+        <button class="btn ghost" style="margin-top:6px" onclick="loadPaste('${id}')">Load pasted rows</button>
+      </details>
+      <div id="msg_${id}" style="font-size:11.5px;margin-top:8px"></div>
+    </div>`;
+  const nT=S.events.filter(e=>e.cls==="Transit").length, nA=S.events.filter(e=>e.cls==="Aspect").length;
+  return `<div class="g3">
+    ${box("nifty","1 · NIFTY DAILY OHLC","The market side. Everything is derived from this.",
+      "Date, Open, High, Low, Close",S.daily.length,"2015-01-09, 8285.45, 8301.30, 8285.45, 8301.20")}
+    ${box("transit","2 · PLANETARY TRANSITS","Sign changes. Motion states are derived automatically.",
+      "Date, Planet, Raasi, Time, RetroFlag",nT,"14/01/2015, Surya, Makara, 19:35, Forward")}
+    ${box("aspect","3 · PLANETARY ASPECTS","Mutual aspects. Degree or aspect name, either works.",
+      "Date, Planet1, Planet2, Degree, Time",nA,"08/01/2014, Budha, Shukra, 0, 03:30")}
+  </div>
+  <div class="card"><h3>WHAT HAPPENS ON LOAD</h3>
+    <div class="sub">Nothing is sent anywhere — every calculation runs inside this page</div>
+    <div class="g2">
+      <div>
+        <div class="sl"><span class="k">1 · Column detection</span><span class="v">Headers matched by keyword, any order</span></div>
+        <div class="sl"><span class="k">2 · Dates</span><span class="v">DD/MM/YYYY, YYYY-MM-DD, Excel serial, "14 Jan 2015"</span></div>
+        <div class="sl"><span class="k">3 · Planet names</span><span class="v">Sanskrit or English — Surya, Budha, Shukra…</span></div>
+        <div class="sl"><span class="k">4 · Rasi names</span><span class="v">Sanskrit or western — Makara or Capricorn</span></div>
+        <div class="sl"><span class="k">5 · Motion</span><span class="v">Station detected when the retro flag flips</span></div>
+      </div>
+      <div>
+        <div class="sl"><span class="k">6 · Session features</span><span class="v">Gap, body, wicks, close position, ATR, candle type</span></div>
+        <div class="sl"><span class="k">7 · Date matching</span><span class="v">Same day → previous → next trading session</span></div>
+        <div class="sl"><span class="k">8 · Year baselines</span><span class="v">Rebuilt from your own Nifty rows</span></div>
+        <div class="sl"><span class="k">9 · Probabilities</span><span class="v">Every page recalculates instantly</span></div>
+        <div class="sl"><span class="k">Order</span><span class="v">Load Nifty first — events match against it</span></div>
+      </div>
+    </div>
+    ${S.daily.length?`<button class="btn" style="margin-top:12px" onclick="go('dash')">Go to Dashboard →</button>`:""}
+    <button class="btn ghost" style="margin-top:12px;margin-left:8px" onclick="clearAll()">Clear all data</button>
+  </div>`;
+}
+window.loadPaste=id=>{
+  const t=$("paste_"+id).value; if(!t.trim())return;
+  try{ applyTable(id,parsePasted(t)); }catch(e){ msg(id,e.message,false); }
+};
+window.clearAll=()=>{
+  S.daily=[];S.events=[];S.ybase={};S.tset=null;S.tdates=[];S.curIdx=-1;
+  S.f={planet:"",type:"",pair:"",aspect:"",from:"",to:"",dir:"",motion:"",band:"",rule:"",y0:0,y1:0};
+  save();render();
+};
+function msg(id,text,ok){
+  const m=$("msg_"+id); if(!m)return;
+  m.className=ok?"ok":"bad"; m.textContent=text;
+}
+function applyTable(id,tbl){
+  if(id==="nifty"){
+    const n=ingestNifty(tbl);
+    rebuildEvents();
+    msg("nifty",n.toLocaleString()+" sessions loaded and features computed.",true);
+  }else if(id==="transit"){
+    if(!S.daily.length)throw new Error("Load the Nifty file first — events need trading dates to match against.");
+    const ev=ingestTransits(tbl);
+    if(!ev.length)throw new Error("No valid rows found. Check the Date, Planet and Raasi columns.");
+    S.events=S.events.filter(e=>e.cls!=="Transit").concat(ev);
+    rebuildEvents();
+    msg("transit",ev.length+" transits loaded · "+ev.filter(e=>e.valid).length+" matched to sessions.",true);
+  }else{
+    if(!S.daily.length)throw new Error("Load the Nifty file first — events need trading dates to match against.");
+    const ev=ingestAspects(tbl);
+    if(!ev.length)throw new Error("No valid rows found. Check the Date and planet/degree columns.");
+    S.events=S.events.filter(e=>e.cls!=="Aspect").concat(ev);
+    rebuildEvents();
+    msg("aspect",ev.length+" aspects loaded · "+ev.filter(e=>e.valid).length+" matched to sessions.",true);
+  }
+  save(); render();
+}
+function wireData(){
+  ["nifty","transit","aspect"].forEach(id=>{
+    const d=$("drop_"+id),f=$("file_"+id); if(!d||!f)return;
+    d.onclick=()=>f.click();
+    d.ondragover=e=>{e.preventDefault();d.classList.add("over");};
+    d.ondragleave=()=>d.classList.remove("over");
+    d.ondrop=async e=>{e.preventDefault();d.classList.remove("over");
+      if(e.dataTransfer.files[0])await handle(id,e.dataTransfer.files[0]);};
+    f.onchange=async e=>{if(e.target.files[0])await handle(id,e.target.files[0]);};
+  });
+}
+async function handle(id,file){
+  try{ msg(id,"Reading "+file.name+"…",true); applyTable(id,await readFile(file)); }
+  catch(e){ msg(id,e.message,false); }
+}
+
+/* ── SETTINGS ── */
+function pageSettings(){
+  return `<div class="g2">
+    <div class="card"><h3>THRESHOLDS</h3><div class="sub">Changing these recalculates every page</div>
+      <div class="fgrp"><label>Gap threshold — moves inside ± this are "Flat Open"</label>
+        <select id="setGap">${[0.05,0.1,0.15,0.2,0.25,0.3,0.5].map(v=>
+          `<option value="${v}"${S.set.gap===v?" selected":""}>±${v}%</option>`).join("")}</select></div>
+      <div class="spec">Confidence tiers are fixed: <b>Very High</b> 200+, <b>High</b> 100+,
+        <b>Medium</b> 50+, <b>Low</b> 20+, <b>Very Low</b> under 20. Below 20 events a percentage
+        swings several points on one or two sessions, so those rows are description only.</div>
+    </div>
+    <div class="card"><h3>EXCHANGE HOLIDAYS</h3>
+      <div class="sub">Used only for upcoming events — history matches against real sessions</div>
+      <textarea id="setHol" placeholder="2026-01-26&#10;2026-03-06&#10;one date per line">${S.set.holidays.map(d=>iso(d)).join("\n")}</textarea>
+      <button class="btn" style="margin-top:8px" onclick="saveHol()">Save holidays</button>
+      <div class="spec" style="margin-top:9px">${S.set.holidays.length
+        ? S.set.holidays.length+" holidays saved · first "+dstr(S.set.holidays[0])
+          +", last "+dstr(S.set.holidays[S.set.holidays.length-1])+". Weekends are handled automatically."
+        : "No holidays saved — upcoming dates currently skip weekends only. Paste the NSE circular list for full accuracy."}</div>
+    </div>
+  </div>
+  <details class="card" style="padding:0">
+    <summary style="cursor:pointer;padding:13px 14px;list-style:none;display:flex;
+      align-items:center;gap:9px;flex-wrap:wrap">
+      <span style="font-size:11.5px;font-weight:700;letter-spacing:.06em">LOCATION &amp; SOURCE TIMEZONE</span>
+      <span style="font-size:10.5px;color:var(--dim2);margin-left:9px">
+        ${esc(S.set.loc)} · UTC${S.set.srcTz>=0?"+":"−"}${String(Math.floor(Math.abs(S.set.srcTz)/60)).padStart(2,"0")}:${String(Math.abs(S.set.srcTz)%60).padStart(2,"0")}
+        ${S.set.srcTz===MKT_TZ?" · no shift applied":" · shifting "+((MKT_TZ-S.set.srcTz)/60)+"h"}</span>
+      <span style="margin-left:auto;color:var(--dim2);font-size:11px;white-space:nowrap">rarely needed ▾</span>
+    </summary>
+    <div style="padding:0 14px 14px">
+      <div class="sub" style="margin-bottom:11px">Only touch this if your event times came from somewhere
+        other than an Indian city.</div>
+      <div class="g2">
+        <div>
+          <div class="fgrp"><label>Source location of your event times</label>
+            <select id="setLoc">${LOCS.map(l=>
+              `<option value="${esc(l.n)}"${S.set.loc===l.n?" selected":""}>${esc(l.n)} · UTC${l.tz>=0?"+":"−"}${String(Math.floor(Math.abs(l.tz)/60)).padStart(2,"0")}:${String(Math.abs(l.tz)%60).padStart(2,"0")}${l.g?" · geoname "+l.g:""}</option>`).join("")}
+            </select></div>
+          <div class="sl"><span class="k">Market clock</span><span class="v mono">IST · UTC+05:30</span></div>
+          <div class="sl"><span class="k">Source clock</span><span class="v mono">UTC${S.set.srcTz>=0?"+":"−"}${String(Math.floor(Math.abs(S.set.srcTz)/60)).padStart(2,"0")}:${String(Math.abs(S.set.srcTz)%60).padStart(2,"0")}</span></div>
+          <div class="sl"><span class="k">Shift applied to every event</span>
+            <span class="v mono" style="color:${S.set.srcTz===MKT_TZ?"var(--dim)":"var(--amb)"}">
+              ${S.set.srcTz===MKT_TZ?"none":sg1((MKT_TZ-S.set.srcTz)/60)+" hours"}</span></div>
+          <div class="sl"><span class="k">Events whose date moves</span>
+            <span class="v mono">${(()=>{if(S.set.srcTz===MKT_TZ)return "0";
+              let c=0;S.events.forEach(e=>{if(e.rawDate&&e.date&&key(e.rawDate)!==key(e.date))c++;});
+              return c.toLocaleString();})()}</span></div>
+        </div>
+        <div class="spec" style="margin:0">
+          <b style="color:var(--txt)">Every Indian city is on IST</b>, so switching between Tirupati,
+          Chennai or Delhi changes nothing in the clock time of a transit — a planet changes sign at one
+          absolute moment, and drikpanchang already prints it in the local zone of the city you picked.
+          Sunrise-based quantities would differ by location, but this engine does not use them.<br><br>
+          The setting earns its keep when your ephemeris outputs <b style="color:var(--txt)">UTC</b>,
+          or when you scraped a page set to a foreign city. Then an event at 23:50 UTC is 05:20 IST the
+          <i>next</i> morning — so the clock band and sometimes the calendar date both move, which changes
+          which session the event matches. Nothing is re-uploaded; the raw times are kept and re-derived.
+        </div>
+      </div>
+    </div>
+  </details>
+  <div class="card"><h3>EXPORT</h3><div class="sub">Take the computed table anywhere</div>
+    <button class="btn" onclick="exportCSV()">Export matched events (CSV)</button>
+    <button class="btn ghost" style="margin-left:8px" onclick="exportXLSX()">Export workbook (XLSX)</button>
+    <div class="spec" style="margin-top:10px">The CSV is one row per matched event with every derived
+      field — drop it straight into Looker Studio, Power BI or a notebook. The workbook adds the
+      per-group summary and the year baseline sheet.</div>
+  </div>`;
+}
+window.saveHol=()=>{
+  const t=$("setHol").value;
+  S.set.holidays=t.split(/\r?\n/).map(s=>parseDate(s.trim())).filter(Boolean);
+  save();render();
+};
+window.exportXLSX=()=>{
+  const wb=XLSX.utils.book_new();
+  const rows=analysisPool().rows;
+  const ev=rows.map(e=>{const d=dayOf(e);return d?{EventDate:iso(e.date),
+    TradingDate:iso(e.md),Rule:e.rule,Event:e.name,Class:e.cls,Planet:e.planet,
+    Raasi:e.raasi||"",FromRaasi:e.from||"",Aspect:e.aspect||"",Motion:e.motion||"",Band:e.band,
+    GapPct:+f2(d.gap),GapPts:+f2(d.gapPts),CvO:+f2(d.cvo),CvPC:+f2(d.cvpc),Candle:d.candle,
+    RangePct:+f2(d.rngPct),BodyPct:+f1(d.body),ClosePos:+f1(d.cp)}:null;}).filter(Boolean);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ev),"Events");
+  const grp=[...new Set(S.events.filter(e=>e.valid&&e.cls==="Transit").map(e=>e.planet))];
+  const sum=grp.map(p=>{const st=stats(S.events.filter(e=>e.valid&&e.planet===p&&e.cls==="Transit"));
+    return st?{Group:p,N:st.n,Confidence:st.conf[0],GapUpPct:+f1(st.guP),GapDownPct:+f1(st.gdP),
+      FlatPct:+f1(st.flP),GreenPct:+f1(st.grnP),AbovePrevPct:+f1(st.abvP),AvgReturn:+f2(st.retAvg),
+      AvgRange:+f2(st.rngAvg),ClosePos:+f1(st.cpAvg),D_GapUp:+f1(st.dGu),D_Green:+f1(st.dGr)}:null;}).filter(Boolean);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sum),"Planet_Summary");
+  const yb=Object.keys(S.ybase).sort().map(y=>({Year:+y,Sessions:S.ybase[y].n,
+    GapUp:+f1(S.ybase[y].gu*100),GapDown:+f1(S.ybase[y].gd*100),Green:+f1(S.ybase[y].gr*100),
+    AbovePrev:+f1(S.ybase[y].ab*100),AvgReturn:+f2(S.ybase[y].ret),AvgRange:+f2(S.ybase[y].rng)}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(yb),"Year_Baseline");
+  XLSX.writeFile(wb,"astro_nifty_export.xlsx");
+};
+
+/* ══════════════════════════════════════════════════════════════
+   FILTER RAIL
+   ══════════════════════════════════════════════════════════════ */
+function renderRail(){
+  const r=$("rail");
+  if(!S.events.length){r.innerHTML="";return;}
+  const rows=S.events.filter(e=>e.valid);
+  const planets=[...new Set(rows.flatMap(e=>[e.planet,e.p2]).filter(Boolean))].sort();
+  const pairs=[...new Set(rows.map(e=>e.pair).filter(Boolean))].sort();
+  const asps=["Conjunction","Sextile","Square","Trine","Opposition"]
+    .filter(a=>rows.some(e=>e.aspect===a));
+  const froms=[...new Set(rows.map(e=>e.from).filter(Boolean))];
+  const tos=[...new Set(rows.map(e=>e.raasi).filter(Boolean))];
+  const mots=[...new Set(rows.map(e=>e.motion).filter(Boolean))];
+  const bands=BANDS.filter(b=>rows.some(e=>e.band===b));
+  const ys=rows.map(e=>e.md.getFullYear());
+  const y0=Math.min(...ys),y1=Math.max(...ys);
+  const sel=(id,label,opts,val,all)=>`<div class="fgrp"><label>${label}</label>
+    <select id="${id}"><option value="">${all}</option>
+    ${opts.map(o=>`<option value="${esc(o)}"${val===o?" selected":""}>${esc(o)}</option>`).join("")}</select></div>`;
+  const now=new Date();now.setHours(0,0,0,0);
+  const up=S.events.filter(e=>e.date>=now).slice(0,7);
+  r.innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+        <h3 style="margin:0">FILTERS</h3>
+        <button class="btn ghost" style="padding:4px 9px;font-size:10.5px" onclick="resetF()">Reset</button>
+      </div>
+      ${sel("f_type","Event Type",["Transit","Aspect"],S.f.type,"All types")}
+      ${sel("f_planet","Planet (either side)",planets,S.f.planet,"All planets")}
+      ${asps.length?sel("f_aspect","Aspect Angle",asps,S.f.aspect,"All aspects"):""}
+      ${pairs.length?sel("f_pair","Planet Pair",pairs,S.f.pair,"All pairs"):""}
+      ${froms.length?sel("f_from","From Rasi",RAASI.filter(x=>froms.includes(x)),S.f.from,"Any"):""}
+      ${tos.length?sel("f_to","To Rasi",RAASI.filter(x=>tos.includes(x)),S.f.to,"Any"):""}
+      ${sel("f_dir","Direction",["Direct","Retrograde"],S.f.dir,"All")}
+      ${mots.length?sel("f_motion","Motion",MOTIONS.filter(x=>mots.includes(x)),S.f.motion,"All"):""}
+      ${sel("f_band","Clock Band",bands,S.f.band,"All hours")}
+      ${sel("f_rule","Date Rule",RULES,S.f.rule,"All rules")}
+      <div class="fgrp"><label>Year range — ${S.f.y0||y0} to ${S.f.y1||y1}</label>
+        <div style="display:flex;gap:6px">
+          <select id="f_y0">${range(y0,y1).map(y=>`<option value="${y}"${(S.f.y0||y0)===y?" selected":""}>${y}</option>`).join("")}</select>
+          <select id="f_y1">${range(y0,y1).map(y=>`<option value="${y}"${(S.f.y1||y1)===y?" selected":""}>${y}</option>`).join("")}</select>
+        </div></div>
+      <div class="spec" style="margin-top:4px">${filtered().length.toLocaleString()} events match this rail.${
+        S.scope!=="filter"
+        ? ` Pages are showing <b style="color:var(--acc2)">${esc(analysisPool().label)}</b> —
+            pick <b>Filter rail</b> in the scope strip to analyse this set instead.`
+        : " Pages are analysing this set."}</div>
+    </div>
+    ${up.length?`<div class="card"><h3>UPCOMING</h3><div class="sub">Next ${up.length} in your data</div>
+      <ul class="up">${up.map(e=>{
+        const[md,rule]=futureDate(e.date);
+        const c=rule==="Same Day"?"var(--up)":"var(--amb)";
+        return `<li onclick="jump(${S.events.indexOf(e)})" class="${S.curIdx===S.events.indexOf(e)?"on":""}">
+          <div class="dt">${dshort(e.date)}<br>${e.time?tstr(e.time):""}</div>
+          <div style="min-width:0"><div class="nm">${esc(e.name)}</div>
+            <div class="sb">${esc(e.cls==="Transit"?(e.from?e.from+" → "+e.raasi:e.raasi):e.aspect)}</div></div>
+          <span class="st" style="background:${c}"></span></li>`;}).join("")}
+      </ul>
+      <button class="btn ghost" style="width:100%;margin-top:6px" onclick="go('upcoming')">View all</button>
+    </div>`:""}`;
+  const bind=(id,k)=>{const e=$(id);if(e)e.onchange=v=>{S.f[k]=v.target.value;S.curIdx=pickCurrent();save();render();};};
+  bind("f_type","type");bind("f_planet","planet");bind("f_from","from");bind("f_to","to");
+  bind("f_aspect","aspect");bind("f_pair","pair");
+  bind("f_dir","dir");bind("f_motion","motion");bind("f_band","band");bind("f_rule","rule");
+  const b0=$("f_y0"),b1=$("f_y1");
+  if(b0)b0.onchange=e=>{S.f.y0=+e.target.value;S.curIdx=pickCurrent();save();render();};
+  if(b1)b1.onchange=e=>{S.f.y1=+e.target.value;S.curIdx=pickCurrent();save();render();};
+}
+function range(a,b){const o=[];for(let i=a;i<=b;i++)o.push(i);return o;}
+window.resetF=()=>{S.f={planet:"",type:"",pair:"",aspect:"",from:"",to:"",dir:"",motion:"",band:"",rule:"",y0:0,y1:0};
+  S.curIdx=pickCurrent();save();render();};
+window.jump=i=>{S.curIdx=i;S.page="dash";save();render();
+  if(window.innerWidth<=1180)$("rail").classList.remove("open");};
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER
+   ══════════════════════════════════════════════════════════════ */
+function render(){
+  renderNav();
+  const c=$("content");
+  const P={
+    dash:pageDash,
+    upcoming:pageUpcoming,
+    planet:()=>breakdown("Planet analysis",
+      [...new Set(analysisPool().rows.flatMap(e=>[e.planet,e.p2]).filter(Boolean))].sort(),
+      e=>e.planet,
+      "Every graha in the current filter, measured against the market over the same years"),
+    rasi:()=>breakdown("Rasi analysis",
+      RAASI.filter(r=>analysisPool().rows.some(e=>e.raasi===r)),e=>e.raasi,
+      "Sign entered, pooled across all planets so each rasi keeps a usable sample"),
+    motion:()=>breakdown("Motion analysis",
+      MOTIONS.filter(m=>analysisPool().rows.some(e=>e.motion===m)),e=>e.motion,
+      "A station is detected when a planet's retrograde flag flips versus its previous event"),
+    time:()=>breakdown("Time analysis",
+      BANDS.filter(b=>analysisPool().rows.some(e=>e.band===b)),e=>e.band,
+      "Where in the 24-hour clock the event falls. Transits and aspects may cover different eras — filter by type"),
+    candle:pageCandle,
+    range:pageRange,
+    verify:pageVerify,
+    hist:pageHist,
+    base:pageBase,
+    data:pageData,
+    settings:pageSettings
+  }[S.page]||pageDash;
+  c.innerHTML=P();
+  renderRail();
+  if(S.page==="data")wireData();
+  if(S.page==="hist"){const q=$("hq");if(q){q.oninput=e=>{histQ=e.target.value;
+    const s=e.target.selectionStart;render();const n=$("hq");if(n){n.focus();n.setSelectionRange(s,s);}};}}
+  if(S.page==="settings"){
+    const g=$("setGap");if(g)g.onchange=e=>{S.set.gap=+e.target.value;buildBaselines();save();render();};
+    const L=$("setLoc");if(L)L.onchange=e=>{
+      const l=LOCS.find(x=>x.n===e.target.value); if(!l)return;
+      S.set.loc=l.n; S.set.srcTz=l.tz; rebuildEvents(); S.curIdx=pickCurrent(); save(); render();};
+  }
+  const pick=$("evPick");
+  if(pick){
+    const rows=filtered();
+    const near=rows.slice(Math.max(0,rows.indexOf(S.events[S.curIdx])-40));
+    pick.innerHTML=rows.map(e=>{const i=S.events.indexOf(e);
+      return `<option value="${i}"${i===S.curIdx?" selected":""}>${esc(dstr(e.date))} — ${esc(e.name)}</option>`;}).join("");
+    pick.onchange=e=>{S.curIdx=+e.target.value;save();render();};
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PERSISTENCE (best-effort — silently skipped where unavailable)
+   ══════════════════════════════════════════════════════════════ */
+function save(){
+  try{
+    const d={v:1,gap:S.set.gap,hol:S.set.holidays.map(x=>iso(x)),f:S.f,page:S.page,
+      scope:S.scope,cur:S.curIdx,srcTz:S.set.srcTz,loc:S.set.loc,basis:S.set.basis,
+      theme:S.set.theme,asof:iso(S.asof),
+      daily:S.daily.map(x=>[iso(x.d),x.o,x.h,x.l,x.c]),
+      events:S.events.map(e=>[e.cls,e.planet,e.raasi,e.from,e.aspect,e.deg,e.p2,e.motion,
+        iso(e.rawDate||e.date),e.rawTime?tstr(e.rawTime):(e.time?tstr(e.time):""),e.pair||""])};
+    localStorage.setItem("astroNifty",JSON.stringify(d));
+  }catch(e){/* storage unavailable — session only */}
+}
+function load(){
+  try{
+    const raw=localStorage.getItem("astroNifty"); if(!raw)return false;
+    const d=JSON.parse(raw); if(!d||d.v!==1)return false;
+    S.set.gap=d.gap||0.15;
+    if(typeof d.srcTz==="number")S.set.srcTz=d.srcTz;
+    if(d.basis)S.set.basis=d.basis;
+    if(d.theme)S.set.theme=d.theme;
+    if(d.asof)S.asof=parseDate(d.asof);
+    if(d.loc)S.set.loc=d.loc;
+    S.set.holidays=(d.hol||[]).map(s=>parseDate(s)).filter(Boolean);
+    if(d.daily&&d.daily.length){
+      ingestNifty({heads:["Date","Open","High","Low","Close"],data:d.daily});
+    }
+    if(d.events&&d.events.length){
+      S.events=d.events.map(a=>{
+        const rawDate=parseDate(a[8]);
+        const rawTime=a[9]?a[9].split(":").map(Number):null;
+        return{cls:a[0],planet:a[1],raasi:a[2],from:a[3],aspect:a[4],deg:a[5],p2:a[6],motion:a[7],
+          rawDate,rawTime,date:rawDate,time:rawTime,pair:a[10]||null,
+          name:a[0]==="Transit"?a[1]+" enters "+a[2]:(a[10]||"")+" "+(a[4]||"")};
+      }).filter(e=>e.rawDate);
+    }
+    if(d.f)S.f=Object.assign(S.f,d.f);
+    if(d.page)S.page=d.page;
+    if(d.scope)S.scope=d.scope;
+    rebuildEvents();
+    if(typeof d.cur==="number"&&S.events[d.cur])S.curIdx=d.cur;
+    return true;
+  }catch(e){return false;}
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════════════ */
+$("hamb").onclick=()=>{$("side").classList.toggle("open");$("scrim").classList.toggle("on");};
+$("scrim").onclick=()=>{$("side").classList.remove("open");$("scrim").classList.remove("on");
+  $("rail").classList.remove("open");};
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme",S.set.theme||"dark");
+  const b=$("themeBtn");
+  if(b)b.title=(S.set.theme==="light"?"Switch to dark":"Switch to light")+" theme";
+}
+function wireBasis(){
+  const seg=$("basisSeg"); if(!seg||!seg.querySelectorAll)return;
+  seg.querySelectorAll("button").forEach(b=>{
+    b.classList.toggle("on",b.dataset.b===S.set.basis);
+    b.onclick=()=>{ if(S.set.basis===b.dataset.b)return;
+      S.set.basis=b.dataset.b; applyBasis(); save(); render(); };
+  });
+}
+$("railBtn").onclick=()=>{
+  if(window.innerWidth<=1180){$("rail").classList.toggle("open");
+    $("scrim").classList.toggle("on",$("rail").classList.contains("open"));}
+};
+$("themeBtn").onclick=()=>{
+  S.set.theme=(S.set.theme==="light"?"dark":"light"); applyTheme(); save(); render();
+};
+async function loadRemoteNifty(){
+  try{
+    const url = "data/nifty_ohlc.csv?v=" + Date.now();
+    const res = await fetch(url, {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    const tbl = parsePasted(text);
+    if(!tbl.data.length) throw new Error("No NIFTY rows found");
+    ingestNifty(tbl);
+    rebuildEvents();
+    S.asof = new Date();
+    save();
+    return true;
+  }catch(e){
+    console.warn("Remote NIFTY data unavailable:", e.message);
+    return false;
+  }
+}
+
+const had=load();
+applyTheme();
+if(!had)S.page="data";
+render();
+
+loadRemoteNifty().then(ok=>{
+  if(ok){
+    if(S.page==="data" && S.daily.length) S.page="dash";
+    render();
+  }
+});
+</script>
+</body>
+</html>
