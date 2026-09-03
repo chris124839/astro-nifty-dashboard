@@ -1,0 +1,41 @@
+name: Update NSE Holidays
+
+on:
+  schedule:
+    - cron: "30 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-holidays:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas lxml
+
+      - name: Update NSE holidays
+        run: |
+          python scripts/update_nse_holidays.py
+
+      - name: Commit updated holidays
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/nse_holidays.csv data/nse_holidays.json
+
+          git diff --cached --quiet || git commit -m "Auto update NSE holidays"
+
+          git push
