@@ -23,9 +23,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Playwright
         run: |
-          pip install requests beautifulsoup4 lxml
+          pip install playwright
+          playwright install --with-deps chromium
 
       - name: Update NSE holidays
         run: |
