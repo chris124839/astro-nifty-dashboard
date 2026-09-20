@@ -60,14 +60,23 @@ for row in ws.iter_rows(min_row=2, values_only=True):
     if not value:
         continue
 
-    try:
+try:
 
-        if isinstance(value, datetime):
-            dt = value
-        else:
-            dt = datetime.strptime(
-                str(value),
-                "%d/%m/%Y"
+    if isinstance(value, datetime):
+        dt = value
+
+    else:
+        text = str(value).strip()
+
+        try:
+            dt = datetime.fromisoformat(
+                text.replace("Z", "")
+            )
+
+        except:
+            dt = parser.parse(
+                text,
+                dayfirst=True
             )
 
         if last_date is None or dt > last_date:
@@ -321,12 +330,43 @@ rows = list(
     )
 )
 
+def safe_date(value):
+
+    if isinstance(value, datetime):
+        return value
+
+    text = str(value).strip()
+
+    # Handle Excel/ISO datetime
+    try:
+        return datetime.fromisoformat(
+            text.replace("Z", "")
+        )
+    except:
+        pass
+
+    # Handle DD/MM/YYYY
+    try:
+        return datetime.strptime(
+            text,
+            "%d/%m/%Y"
+        )
+    except:
+        pass
+
+    # Last fallback
+    try:
+        return parser.parse(
+            text,
+            dayfirst=True
+        )
+    except:
+        return datetime.max
+
+
 rows.sort(
     key=lambda r: (
-        datetime.strptime(
-            str(r[0]),
-            "%d/%m/%Y"
-        ),
+        safe_date(r[0]),
         str(r[1]),
         str(r[3])
     )
