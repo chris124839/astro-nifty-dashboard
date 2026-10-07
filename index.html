@@ -15,9 +15,9 @@
   --txt:#E8EDF5; --dim:#94A3B8; --dim2:#64748B;
   --acc:#3B82F6; --acc2:#60A5FA;
   --up:#22C55E; --dn:#EF4444; --amb:#F59E0B; --pur:#A855F7; --cy:#06B6D4;
-  --upT:rgba(34,197,94,.13); --dnT:rgba(239,68,68,.12); --ambT:rgba(245,158,11,.13);
-  --accT:rgba(59,130,246,.12); --purT:rgba(168,85,247,.12); --purS:rgba(168,85,247,.42);
-  --hair:rgba(148,163,184,.20); --rowline:rgba(46,61,87,.70); --veil:rgba(0,0,0,.40);
+  --upT:var(--upT); --dnT:var(--dnT); --ambT:var(--ambT);
+  --accT:var(--accT); --purT:var(--purT); --purS:var(--purS);
+  --hair:var(--hair); --rowline:var(--rowline); --veil:var(--veil);
   --onUp:#052e16; --onDn:#450a0a; --onAmb:#451a03; --onPur:#2e1065; --onCy:#083344;
   --sbw:212px; --rw:270px;
 }
@@ -2123,6 +2123,102 @@ function load(){
   }catch(e){return false;}
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   GITHUB DATA CENTER — DEVICE-INDEPENDENT AUTO LOAD
+   ══════════════════════════════════════════════════════════════ */
+const REMOTE_DATA_FILES = {
+  nifty: "./data/nifty_ohlc.csv",
+  transit: "./data/Planets%20Transists.xlsx",
+  aspect: "./data/Planets%20aspects.xlsx"
+};
+
+async function fetchRemoteTable(url, label){
+  const bust = (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+  const res = await fetch(url + bust, {cache:"no-store"});
+  if(!res.ok) throw new Error(label + " HTTP " + res.status);
+
+  if(/\.xlsx(?:[?#]|$)/i.test(url)){
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), {type:"array", cellDates:false});
+
+    let sheetName = wb.SheetNames[0];
+    if(label === "Planet Transits" && wb.SheetNames.includes("02_Raw_Transits"))
+      sheetName = "02_Raw_Transits";
+    if(label === "Planet Aspects" && wb.SheetNames.includes("03_Raw_Aspects"))
+      sheetName = "03_Raw_Aspects";
+
+    const sh = wb.Sheets[sheetName];
+    if(!sh) throw new Error(label + " has no readable sheet");
+
+    return rows2obj(
+      XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null})
+    );
+  }
+
+  const txt = await res.text();
+  const wb = XLSX.read(txt,{type:"string"});
+  const sh = wb.Sheets[wb.SheetNames[0]];
+  return rows2obj(
+    XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null})
+  );
+}
+
+async function loadGitHubDataCenter(){
+  const status = s => {
+    const el = $("asof");
+    if(el) el.textContent = s;
+  };
+
+  try{
+    status("Loading GitHub data…");
+
+    // Nifty first: event matching depends on trading sessions.
+    const nifty = await fetchRemoteTable(
+      REMOTE_DATA_FILES.nifty, "Nifty data"
+    );
+    ingestNifty(nifty);
+
+    const transit = await fetchRemoteTable(
+      REMOTE_DATA_FILES.transit, "Planet Transits"
+    );
+    const transitEvents = ingestTransits(transit);
+
+    const aspect = await fetchRemoteTable(
+      REMOTE_DATA_FILES.aspect, "Planet Aspects"
+    );
+    const aspectEvents = ingestAspects(aspect);
+
+    S.events = transitEvents.concat(aspectEvents);
+    rebuildEvents();
+
+    S.asof = S.daily.length
+      ? S.daily[S.daily.length - 1].d
+      : null;
+
+    // Cache the latest GitHub dataset locally, but GitHub remains canonical.
+    save();
+    render();
+
+    status(
+      "GitHub data • " +
+      S.daily.length.toLocaleString() + " Nifty • " +
+      transitEvents.length.toLocaleString() + " transits • " +
+      aspectEvents.length.toLocaleString() + " aspects"
+    );
+
+    console.log("[ASTRO NIFTY] GitHub Data Center loaded", {
+      nifty:S.daily.length,
+      transits:transitEvents.length,
+      aspects:aspectEvents.length
+    });
+
+  }catch(err){
+    console.error("[ASTRO NIFTY] GitHub Data Center load failed:", err);
+    status("GitHub data load failed — using saved browser data");
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
    BOOT
    ══════════════════════════════════════════════════════════════ */
@@ -2149,36 +2245,14 @@ $("railBtn").onclick=()=>{
 $("themeBtn").onclick=()=>{
   S.set.theme=(S.set.theme==="light"?"dark":"light"); applyTheme(); save(); render();
 };
-async function loadRemoteNifty(){
-  try{
-    const url = "data/nifty_ohlc.csv?v=" + Date.now();
-    const res = await fetch(url, {cache:"no-store"});
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const text = await res.text();
-    const tbl = parsePasted(text);
-    if(!tbl.data.length) throw new Error("No NIFTY rows found");
-    ingestNifty(tbl);
-    rebuildEvents();
-    S.asof = new Date();
-    save();
-    return true;
-  }catch(e){
-    console.warn("Remote NIFTY data unavailable:", e.message);
-    return false;
-  }
-}
-
 const had=load();
 applyTheme();
 if(!had)S.page="data";
 render();
 
-loadRemoteNifty().then(ok=>{
-  if(ok){
-    if(S.page==="data" && S.daily.length) S.page="dash";
-    render();
-  }
-});
+// Always refresh the canonical dataset from GitHub so every device/browser
+// sees the same Nifty, transit and aspect data.
+loadGitHubDataCenter();
 </script>
 </body>
 </html>
