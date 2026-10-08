@@ -2128,9 +2128,9 @@ function load(){
    GITHUB DATA CENTER — DEVICE-INDEPENDENT AUTO LOAD
    ══════════════════════════════════════════════════════════════ */
 const REMOTE_DATA_FILES = {
-  nifty: "./data/nifty_ohlc.csv",
-  transit: "./data/Planets%20Transists.xlsx",
-  aspect: "./data/Planets%20aspects.xlsx"
+  nifty: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/nifty_ohlc.csv",
+  transit: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/Planets%20Transists.xlsx",
+  aspect: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/Planets%20aspects.xlsx"
 };
 
 async function fetchRemoteTable(url, label){
@@ -2215,7 +2215,7 @@ async function loadGitHubDataCenter(){
 
   }catch(err){
     console.error("[ASTRO NIFTY] GitHub Data Center load failed:", err);
-    status("GitHub data load failed — using saved browser data");
+    status("GitHub data unavailable — saved data may be stale");
   }
 }
 
