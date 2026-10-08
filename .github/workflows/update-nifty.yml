@@ -3,12 +3,17 @@ name: Update NIFTY OHLC
 on:
   workflow_dispatch:
   schedule:
-    # 6:45 PM India time = 13:15 UTC.
-    # Monday-Friday.
+    # 6:45 PM IST = 13:15 UTC
     - cron: "15 13 * * 1-5"
+    # Safety retry: 7:15 PM IST = 13:45 UTC
+    - cron: "45 13 * * 1-5"
 
 permissions:
   contents: write
+
+concurrency:
+  group: nifty-ohlc-update
+  cancel-in-progress: false
 
 jobs:
   update:
@@ -16,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,5 +37,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/nifty_ohlc.csv data/nifty_ohlc.json
-          git diff --cached --quiet || git commit -m "Auto-update NIFTY OHLC"
-          git push
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "Auto-update NIFTY OHLC"
+            git push
+          fi
