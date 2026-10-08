@@ -2125,97 +2125,96 @@ function load(){
 
 
 /* ══════════════════════════════════════════════════════════════
-   GITHUB DATA CENTER — DEVICE-INDEPENDENT AUTO LOAD
+   GITHUB DATA CENTER — LIVE PLANETS
+   This layer only feeds the existing ingest functions.
+   It does not change the analysis calculations.
    ══════════════════════════════════════════════════════════════ */
-const REMOTE_DATA_FILES = {
-  nifty: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/nifty_ohlc.csv",
-  transit: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/Planets%20Transists.xlsx",
+const GITHUB_DATA = {
+  nifty:  "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/nifty_ohlc.csv",
+  transit:"https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/Planets%20Transists.xlsx",
   aspect: "https://raw.githubusercontent.com/chris124839/astro-nifty-dashboard/main/data/Planets%20aspects.xlsx"
 };
 
-async function fetchRemoteTable(url, label){
-  const bust = (url.includes("?") ? "&" : "?") + "v=" + Date.now();
-  const res = await fetch(url + bust, {cache:"no-store"});
-  if(!res.ok) throw new Error(label + " HTTP " + res.status);
-
-  if(/\.xlsx(?:[?#]|$)/i.test(url)){
-    const buf = await res.arrayBuffer();
-    const wb = XLSX.read(new Uint8Array(buf), {type:"array", cellDates:false});
-
-    let sheetName = wb.SheetNames[0];
-    if(label === "Planet Transits" && wb.SheetNames.includes("02_Raw_Transits"))
-      sheetName = "02_Raw_Transits";
-    if(label === "Planet Aspects" && wb.SheetNames.includes("03_Raw_Aspects"))
-      sheetName = "03_Raw_Aspects";
-
-    const sh = wb.Sheets[sheetName];
-    if(!sh) throw new Error(label + " has no readable sheet");
-
-    return rows2obj(
-      XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null})
-    );
-  }
-
-  const txt = await res.text();
-  const wb = XLSX.read(txt,{type:"string"});
-  const sh = wb.Sheets[wb.SheetNames[0]];
-  return rows2obj(
-    XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null})
-  );
+async function githubFile(url, label){
+  const u = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+  const r = await fetch(u, {cache:"no-store"});
+  if(!r.ok) throw new Error(label + " HTTP " + r.status);
+  return new Uint8Array(await r.arrayBuffer());
 }
 
-async function loadGitHubDataCenter(){
-  const status = s => {
-    const el = $("asof");
-    if(el) el.textContent = s;
-  };
+function bytesToTable(bytes, label){
+  const wb = XLSX.read(bytes, {type:"array", cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if(!ws) throw new Error(label + " has no worksheet.");
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+  if(!rows.length) throw new Error(label + " is empty.");
+  const heads = rows[0].map(v=>String(v??"").trim());
+  return {heads, data:rows.slice(1)};
+}
 
+async function loadGitHubPlanetData(){
+  // Nifty must be loaded first because the existing planet matching logic
+  // intentionally matches events against trading sessions.
+  const transitBytes = await githubFile(GITHUB_DATA.transit, "Planet transits");
+  const aspectBytes  = await githubFile(GITHUB_DATA.aspect,  "Planet aspects");
+
+  const transitTable = bytesToTable(transitBytes, "Planets Transists.xlsx");
+  const aspectTable  = bytesToTable(aspectBytes,  "Planets aspects.xlsx");
+
+  if(!S.daily.length)
+    throw new Error("Nifty data is not loaded yet.");
+
+  const transitEvents = ingestTransits(transitTable);
+  const aspectEvents  = ingestAspects(aspectTable);
+
+  if(!transitEvents.length)
+    throw new Error("GitHub Planet Transists file returned no valid events.");
+  if(!aspectEvents.length)
+    throw new Error("GitHub Planet aspects file returned no valid events.");
+
+  // Replace only the corresponding event classes; preserve everything else.
+  S.events = S.events.filter(e => e.cls!=="Transit" && e.cls!=="Aspect")
+                      .concat(transitEvents, aspectEvents);
+
+  rebuildEvents();
+  save();
+  render();
+
+  const t = S.events.filter(e=>e.cls==="Transit").length;
+  const a = S.events.filter(e=>e.cls==="Aspect").length;
+  console.info("GitHub planets loaded:", {transits:t, aspects:a});
+}
+
+async function loadGitHubAll(){
   try{
-    status("Loading GitHub data…");
+    // Nifty is already handled by the working GitHub Nifty loader when present.
+    // If that loader exists, use it; otherwise load the CSV through the original
+    // CSV parser and existing ingestNifty function.
+    if(typeof loadLiveNifty === "function"){
+      await loadLiveNifty();
+    }else{
+      const bytes = await githubFile(GITHUB_DATA.nifty, "Nifty");
+      const text = new TextDecoder().decode(bytes);
+      const lines = text.trim().split(/\r?\n/);
+      const rows = lines.map(line => line.split(","));
+      const heads = rows.shift();
+      ingestNifty({heads, data:rows});
+      rebuildEvents();
+      save();
+      render();
+    }
 
-    // Nifty first: event matching depends on trading sessions.
-    const nifty = await fetchRemoteTable(
-      REMOTE_DATA_FILES.nifty, "Nifty data"
-    );
-    ingestNifty(nifty);
+    await loadGitHubPlanetData();
 
-    const transit = await fetchRemoteTable(
-      REMOTE_DATA_FILES.transit, "Planet Transits"
-    );
-    const transitEvents = ingestTransits(transit);
-
-    const aspect = await fetchRemoteTable(
-      REMOTE_DATA_FILES.aspect, "Planet Aspects"
-    );
-    const aspectEvents = ingestAspects(aspect);
-
-    S.events = transitEvents.concat(aspectEvents);
-    rebuildEvents();
-
-    S.asof = S.daily.length
-      ? S.daily[S.daily.length - 1].d
-      : null;
-
-    // Cache the latest GitHub dataset locally, but GitHub remains canonical.
-    save();
-    render();
-
-    status(
-      "GitHub data • " +
-      S.daily.length.toLocaleString() + " Nifty • " +
-      transitEvents.length.toLocaleString() + " transits • " +
-      aspectEvents.length.toLocaleString() + " aspects"
-    );
-
-    console.log("[ASTRO NIFTY] GitHub Data Center loaded", {
-      nifty:S.daily.length,
-      transits:transitEvents.length,
-      aspects:aspectEvents.length
-    });
-
+    const A=$("asof");
+    if(A) A.title="Nifty + Planetary data loaded from GitHub";
   }catch(err){
-    console.error("[ASTRO NIFTY] GitHub Data Center load failed:", err);
-    status("GitHub data unavailable — saved data may be stale");
+    console.warn("GitHub planetary data load failed:", err);
+    const A=$("asof");
+    if(A){
+      A.title="Nifty may be live, but planetary GitHub data could not be loaded: "
+              +(err.message||err);
+    }
   }
 }
 
@@ -2250,9 +2249,8 @@ applyTheme();
 if(!had)S.page="data";
 render();
 
-// Always refresh the canonical dataset from GitHub so every device/browser
-// sees the same Nifty, transit and aspect data.
-loadGitHubDataCenter();
+// GitHub is the canonical live source. Existing analysis logic is unchanged.
+loadGitHubAll();
 </script>
 </body>
 </html>
