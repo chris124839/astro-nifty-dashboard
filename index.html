@@ -609,20 +609,18 @@ function bandOf(t){
 }
 /* Shift an event's raw clock time into market time (IST). If the shift crosses
    midnight the calendar date moves with it, which is why this runs before matching. */
+
 function applyTz(e){
-  const shift=MKT_TZ-(S.set.srcTz||0);
+  // Excel planetary values are already in IST.
   if(!e.rawDate)e.rawDate=e.date;
   if(e.rawTime===undefined)e.rawTime=e.time||null;
-  if(!e.rawTime||!shift){
-    e.date=new Date(e.rawDate.getFullYear(),e.rawDate.getMonth(),e.rawDate.getDate());
-    e.time=e.rawTime?[e.rawTime[0],e.rawTime[1]]:null;
-  }else{
-    const dt=new Date(e.rawDate.getFullYear(),e.rawDate.getMonth(),e.rawDate.getDate(),
-                      e.rawTime[0],e.rawTime[1]);
-    dt.setMinutes(dt.getMinutes()+shift);
-    e.date=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
-    e.time=[dt.getHours(),dt.getMinutes()];
-  }
+
+  e.date=new Date(
+    e.rawDate.getFullYear(),
+    e.rawDate.getMonth(),
+    e.rawDate.getDate()
+  );
+  e.time=e.rawTime?[e.rawTime[0],e.rawTime[1]]:null;
   e.band=bandOf(e.time);
   return e;
 }
