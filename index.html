@@ -1513,7 +1513,7 @@ function pageHist(){
       <button class="btn ghost" onclick="exportCSV()">Export CSV</button>
     </div>
     <div class="tw" style="max-height:66vh;overflow-y:auto"><table>
-      <thead><tr><th>EVENT DATE</th><th>TRADING DATE</th><th>RULE</th><th>EVENT</th><th>CLASS</th>
+      <thead><tr><th>EVENT DATE (SOURCE)</th><th>MATCHED NIFTY DATE</th><th>DATE MATCH RULE</th><th>EVENT</th><th>CLASS</th>
         <th>MOTION</th><th>BAND</th><th>GAP %</th><th>OPEN→CLOSE</th><th>vs PREV</th>
         <th>CANDLE</th><th>RANGE %</th><th>CLOSE POS</th></tr></thead>
       <tbody>${show.map(e=>{const d=dayOf(e);if(!d)return"";
@@ -2141,7 +2141,9 @@ async function githubFile(url, label){
 }
 
 function bytesToTable(bytes, label){
-  const wb = XLSX.read(bytes, {type:"array", cellDates:true});
+  // Keep Excel date cells as serial numbers. parseDate() converts serials using
+  // UTC calendar arithmetic, avoiding SheetJS Date objects shifting a day by timezone.
+  const wb = XLSX.read(bytes, {type:"array", cellDates:false});
   const ws = wb.Sheets[wb.SheetNames[0]];
   if(!ws) throw new Error(label + " has no worksheet.");
   const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
@@ -2205,7 +2207,17 @@ async function loadGitHubAll(){
     await loadGitHubPlanetData();
 
     const A=$("asof");
-    if(A) A.title="Nifty + Planetary data loaded from GitHub";
+    const last=S.daily.length?S.daily[S.daily.length-1].d:null;
+    if(A){
+      A.title="Nifty + planetary data loaded from GitHub"
+        +(last?"; latest Nifty row: "+iso(last):"")
+        +(S.asof?"; backtest cutoff remains active: "+iso(S.asof):"");
+    }
+    console.info("GitHub data verified:", {
+      latestNiftyDate:last?iso(last):null,
+      cutoffDate:S.asof?iso(S.asof):null,
+      niftyRows:S.daily.length
+    });
   }catch(err){
     console.warn("GitHub planetary data load failed:", err);
     const A=$("asof");
