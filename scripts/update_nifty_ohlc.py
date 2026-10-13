@@ -62,9 +62,66 @@ def fetch_url(base_url):
     return rows
 
 
+def fetch_niftyindices():
+    """Fetch official daily NIFTY 50 OHLC from NSE Indices as a Yahoo fallback."""
+    now_ist = datetime.now(IST).date()
+    start = now_ist - timedelta(days=35)
+    cinfo = (
+        "{'name':'NIFTY 50',"
+        f"'startDate':'{start.strftime('%d %b %Y')}',"
+        f"'endDate':'{now_ist.strftime('%d %b %Y')}',"
+        "'indexName':'NIFTY 50'}"
+    )
+    body = json.dumps({"cinfo": cinfo}).encode("utf-8")
+    req = Request(
+        "https://www.niftyindices.com/Backpage.aspx/getHistoricaldatatabletoString",
+        data=body,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Referer": "https://www.niftyindices.com/reports/historical-data",
+            "Origin": "https://www.niftyindices.com",
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json, text/plain, */*",
+        },
+        method="POST",
+    )
+    with urlopen(req, timeout=45) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    raw = payload.get("d", "[]")
+    data = json.loads(raw) if isinstance(raw, str) and raw not in ("", "false", "[]") else raw
+    rows = []
+    for item in data or []:
+        try:
+            d = datetime.strptime(item["HistoricalDate"].strip(), "%d %b %Y").date()
+            row = {
+                "Date": d.isoformat(),
+                "Open": round(float(item["OPEN"].replace(",", "")), 2),
+                "High": round(float(item["HIGH"].replace(",", "")), 2),
+                "Low": round(float(item["LOW"].replace(",", "")), 2),
+                "Close": round(float(item["CLOSE"].replace(",", "")), 2),
+            }
+            if row["High"] >= max(row["Open"], row["Close"]) and row["Low"] <= min(row["Open"], row["Close"]):
+                rows.append(row)
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not rows:
+        raise RuntimeError("NSE Indices returned no valid NIFTY 50 OHLC rows")
+    rows.sort(key=lambda r: r["Date"])
+    return rows
+
+
 def fetch_nifty():
     errors = []
-    for attempt in range(8):
+    # Prefer the official index publisher. Yahoo is retained as a fallback.
+    try:
+        rows = fetch_niftyindices()
+        print(f"NSE Indices source OK; fetched {len(rows)} rows; latest={rows[-1]['Date']}")
+        return rows
+    except Exception as exc:
+        errors.append(f"NSE Indices: {exc}")
+        print(f"NSE Indices source failed: {exc}")
+
+    for attempt in range(4):
         for url in URLS:
             try:
                 rows = fetch_url(url)
@@ -74,11 +131,9 @@ def fetch_nifty():
             except Exception as exc:
                 errors.append(f"{url}: {exc}")
                 print(f"Attempt {attempt + 1} failed: {url} -> {exc}")
-        if attempt < 7:
-            time.sleep(15)
-    raise RuntimeError("NIFTY fetch failed after retries:\n" + "\n".join(errors[-8:]))
-
-
+        if attempt < 3:
+            time.sleep(10)
+    raise RuntimeError("NIFTY fetch failed after retries:\n" + "\n".join(errors[-10:]))
 def read_existing():
     existing = {}
     if CSV_FILE.exists():
