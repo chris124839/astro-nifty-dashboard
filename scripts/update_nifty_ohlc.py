@@ -173,25 +173,31 @@ def main():
 
     rows = [existing[d] for d in sorted(existing)]
     new_latest = rows[-1]["Date"]
-    changed = new_latest != old_latest or any(existing.get(r["Date"]) != r for r in new_rows if r["Date"] in existing)
-
-    write_data(rows)
 
     print(f"NIFTY UPDATE: previous_latest={old_latest}")
     print(f"NIFTY UPDATE: current_latest={new_latest}")
     print(f"NIFTY UPDATE: total_rows={len(rows)}")
 
-    # Never silently call an old dataset a successful refresh on a normal weekday.
+    # Do not report success if a normal weekday session is missing.
+    # At 6 AM IST, expect the previous weekday's close; after 3:30 PM IST,
+    # expect today's close. Weekend runs expect Friday's close.
     now_ist = datetime.now(IST)
-    if now_ist.weekday() < 5:
-        age_days = (now_ist.date() - datetime.fromisoformat(new_latest).date()).days
-        # A 3-day allowance covers a weekend and a single exchange holiday.
-        if age_days > 3:
-            raise RuntimeError(
-                f"DATA STALE: latest NIFTY session is {new_latest}; today is {now_ist.date()}. "
-                "Yahoo did not provide a sufficiently recent trading session."
-            )
+    expected = now_ist.date()
+    if now_ist.weekday() < 5 and now_ist.time() < datetime.strptime("15:30", "%H:%M").time():
+        expected -= timedelta(days=1)
+    while expected.weekday() >= 5:
+        expected -= timedelta(days=1)
 
+    latest_date = datetime.fromisoformat(new_latest).date()
+    if latest_date < expected:
+        raise RuntimeError(
+            f"DATA STALE: latest NIFTY session is {new_latest}; expected at least {expected}. "
+            "The data provider returned an old session, so no successful refresh will be reported."
+        )
+
+    changed = new_latest != old_latest or any(existing.get(r["Date"]) != r for r in new_rows if r["Date"] in existing)
+    write_data(rows)
+    print(f"NIFTY UPDATE: data_changed={changed}")
     print("NIFTY UPDATE SUCCESS")
 
 
