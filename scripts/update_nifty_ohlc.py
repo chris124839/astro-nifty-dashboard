@@ -73,20 +73,50 @@ def fetch_niftyindices():
         "'indexName':'NIFTY 50'}"
     )
     body = json.dumps({"cinfo": cinfo}).encode("utf-8")
-    req = Request(
-        "https://www.niftyindices.com/Backpage.aspx/getHistoricaldatatabletoString",
-        data=body,
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            "Referer": "https://www.niftyindices.com/reports/historical-data",
-            "Origin": "https://www.niftyindices.com",
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json, text/plain, */*",
-        },
-        method="POST",
-    )
-    with urlopen(req, timeout=45) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    page_url = "https://www.niftyindices.com/reports/historical-data"
+    api_url = "https://www.niftyindices.com/Backpage.aspx/getHistoricaldatatabletoString"
+    headers = {
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": page_url,
+        "Origin": "https://www.niftyindices.com",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/plain, */*",
+    }
+
+    # The historical page establishes a session with the site's edge protection.
+    # Do not fail the API fetch solely because this optional bootstrap is blocked.
+    try:
+        with urlopen(Request(page_url, headers={"User-Agent": headers["User-Agent"]}), timeout=8) as page:
+            page.read(1024)
+    except Exception as exc:
+        print(f"NSE page bootstrap warning: {exc}")
+
+    last_error = None
+    payload = None
+    for attempt in range(3):
+        try:
+            req = Request(api_url, data=body, headers=headers, method="POST")
+            with urlopen(req, timeout=45) as response:
+                response_text = response.read().decode("utf-8", errors="replace")
+                if "json" not in response.headers.get("Content-Type", "").lower() and not response_text.lstrip().startswith("{"):
+                    raise RuntimeError(
+                        f"NSE returned non-JSON content (HTTP {response.status}, "
+                        f"Content-Type={response.headers.get('Content-Type', 'unknown')})"
+                    )
+                payload = json.loads(response_text)
+            break
+        except Exception as exc:
+            last_error = exc
+            print(f"NSE Indices attempt {attempt + 1}/3 failed: {exc}")
+            if attempt < 2:
+                time.sleep(3 * (attempt + 1))
+    if payload is None:
+        raise RuntimeError(f"NSE Indices API unavailable after retries: {last_error}")
+
     raw = payload.get("d", "[]")
     data = json.loads(raw) if isinstance(raw, str) and raw not in ("", "false", "[]") else raw
     rows = []
