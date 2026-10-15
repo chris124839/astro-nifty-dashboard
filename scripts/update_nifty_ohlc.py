@@ -208,21 +208,27 @@ def main():
     print(f"NIFTY UPDATE: current_latest={new_latest}")
     print(f"NIFTY UPDATE: total_rows={len(rows)}")
 
-    # Do not report success if a normal weekday session is missing.
-    # At 6 AM IST, expect the previous weekday's close; after 3:30 PM IST,
-    # expect today's close. Weekend runs expect Friday's close.
+    # Evaluate freshness using India Standard Time, not the runner's UTC clock.
+    # NSE holidays are not equivalent to weekdays; allow a holiday/weekend grace
+    # window so a valid last trading session does not become a false failure.
     now_ist = datetime.now(IST)
-    expected = now_ist.date()
-    if now_ist.weekday() < 5 and now_ist.time() < datetime.strptime("15:30", "%H:%M").time():
-        expected -= timedelta(days=1)
-    while expected.weekday() >= 5:
-        expected -= timedelta(days=1)
-
     latest_date = datetime.fromisoformat(new_latest).date()
-    if latest_date < expected:
+    age_days = (now_ist.date() - latest_date).days
+    print(f"NIFTY UPDATE: current_ist={now_ist.isoformat(timespec='seconds')}")
+    print(f"NIFTY UPDATE: latest_session_age_calendar_days={age_days}")
+
+    # A successful provider response can legitimately end several calendar days
+    # back because of exchange holidays, weekends, or a delayed holiday calendar.
+    # Fail only when the data is clearly stale; otherwise log the last session.
+    if age_days > 5:
         raise RuntimeError(
-            f"DATA STALE: latest NIFTY session is {new_latest}; expected at least {expected}. "
-            "The data provider returned an old session, so no successful refresh will be reported."
+            f"DATA STALE: latest NIFTY session is {new_latest} ({age_days} calendar days old in IST). "
+            "More than 5 days have passed without a new session; check source availability and NSE holidays."
+        )
+    if age_days > 1:
+        print(
+            f"NIFTY UPDATE WARNING: latest session is {new_latest}; "
+            "this may be normal around NSE holidays/weekends. Verify the exchange calendar if unexpected."
         )
 
     changed = new_latest != old_latest or any(existing.get(r["Date"]) != r for r in new_rows if r["Date"] in existing)
