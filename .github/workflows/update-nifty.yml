@@ -3,10 +3,9 @@ name: Update NIFTY OHLC
 on:
   workflow_dispatch:
   schedule:
-    # GitHub Actions cron is interpreted in UTC; these are the IST-equivalent instants.
-    # 06:00 IST daily = 00:30 UTC
+    # REQUIRED: GitHub Actions cron uses UTC. 06:00 IST = 00:30 UTC.
     - cron: "30 0 * * *"
-    # 21:00 IST daily = 15:30 UTC
+    # REQUIRED: 21:00 IST = 15:30 UTC.
     - cron: "30 15 * * *"
 
 permissions:
