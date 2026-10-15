@@ -1545,7 +1545,7 @@ function pageEventDay(){
       </div>
       <div class="tw" style="max-height:68vh;overflow-y:auto"><table>
         <thead><tr>
-          <th>#</th><th>EVENT DATE</th><th>MATCHED NIFTY DATE</th><th>DATE RULE</th>
+          <th>#</th><th>EVENT DATE (ADJUSTED)</th>
           <th>PREV CLOSE (₹)</th><th>OPEN (₹)</th><th>HIGH (₹)</th><th>LOW (₹)</th><th>CLOSE (₹)</th>
           <th>GAP (POINTS)</th><th>GAP (%)</th><th>RANGE (H−L)</th>
           <th>DAY MOVE (C−O)</th><th>DAY MOVE (%)</th><th>CANDLE</th><th>CANDLE NAME</th><th>CLOSE POSITION</th>
@@ -1555,8 +1555,7 @@ function pageEventDay(){
           const gapLabel=gp>0?"GAP UP":gp<0?"GAP DOWN":"FLAT";
           return `<tr>
             <td class="mono">${i+1}</td>
-            <td class="mono">${dstr(e.date)}</td><td class="mono">${dstr(e.md)}</td>
-            <td><span class="chp" style="background:${e.rule==="Same Day"?"var(--upT)":"var(--ambT)"};color:${e.rule==="Same Day"?"var(--up)":"var(--amb)"}">${esc(e.rule||"—")}</span></td>
+            <td class="mono">${dstr(e.md)}</td>
             <td class="mono">${fmt(d.pc)}</td><td class="mono">${fmt(d.o)}</td><td class="mono">${fmt(d.h)}</td><td class="mono">${fmt(d.l)}</td>
             <td class="mono" style="font-weight:700;color:${color(d.c-d.o)}">${fmt(d.c)}</td>
             <td class="mono" style="color:${color(gp)}" title="${gapLabel}">${signed(gp)} <span style="font-size:9px">${gapLabel}</span></td>
@@ -1578,13 +1577,13 @@ function pageEventDay(){
 }
 window.exportEventDayCSV=()=>{
   const rows=filtered().map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
-  const head=["EventDate","MatchedNiftyDate","DateRule","Event","Class","PreviousClose","Open","High","Low","Close",
+  const head=["EventDateAdjusted","Event","Class","PreviousClose","Open","High","Low","Close",
     "GapPoints","GapPercent","RangePoints","DayMoveOpenToClosePoints","DayMoveOpenToClosePercent","CandleName","ClosePositionPercent"];
   const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
   const lines=[head.join(",")];
   rows.forEach(({e,d})=>{
     const cp=d.rng>0?(d.c-d.l)/d.rng*100:50;
-    lines.push([iso(e.date),iso(e.md),q(e.rule),q(e.name),q(e.cls),d.pc,d.o,d.h,d.l,d.c,d.gapPts,d.gap,d.h-d.l,d.c-d.o,d.cvo,q(d.candleA),cp].join(","));
+    lines.push([iso(e.md),q(e.name),q(e.cls),d.pc,d.o,d.h,d.l,d.c,d.gapPts,d.gap,d.h-d.l,d.c-d.o,d.cvo,q(d.candleA),cp].join(","));
   });
   const a=document.createElement("a"),url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"}));
   a.href=url;a.download="nifty_event_day_ohlc.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
