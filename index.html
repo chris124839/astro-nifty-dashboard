@@ -628,9 +628,21 @@ function matchDay(d){
   if(!S.tset)return[null,null];
   const k=key(d);
   if(S.tset.has(k))return[S.tdates[S.tset.get(k)],"Same Day"];
+  if(!S.tdates.length)return[null,null];
+
+  /* Future events must not match the previous available OHLC row just because
+     tomorrow's candle has not been published yet. Project future dates using
+     the dashboard holiday list; preserve the existing rule for past events. */
+  const latest=S.tdates[S.tdates.length-1];
+  const today=new Date(); today.setHours(0,0,0,0);
+  if(d>latest&&d>=today){
+    const [projected,rule]=futureDate(d);
+    return[projected,rule];
+  }
+
   const p=new Date(d); p.setDate(p.getDate()-1);
   if(S.tset.has(key(p)))return[S.tdates[S.tset.get(key(p))],"Previous Day"];
-  if(!S.tdates.length||d<S.tdates[0])return[null,null];
+  if(d<S.tdates[0])return[null,null];
   for(let i=0;i<S.tdates.length;i++)if(S.tdates[i]>d)return[S.tdates[i],"Next Day"];
   return[null,null];
 }
@@ -1051,6 +1063,14 @@ function pageDash(){
   const g=PCOL[ev.planet]||["#3B82F6","#6366F1"];
   /* future events have no matched session yet — project one from the holiday calendar */
   const TD_=(()=>{
+    const latest=S.tdates.length?S.tdates[S.tdates.length-1]:null;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const futureUntraded=ev.date>=today&&(!latest||ev.md&&key(ev.md)>key(latest));
+    if(futureUntraded&&ev.md){
+      return ev.rule==="Same Day"
+        ? [ev.md,"PROJECTED","var(--acc2)","var(--accT)"]
+        : [ev.md,"PROJECTED · "+String(ev.rule||"ADJUSTED").toUpperCase(),"var(--acc2)","var(--accT)"];
+    }
     if(ev.md)return ev.rule==="Same Day"
       ? [ev.md,"SAME DAY","var(--up)","var(--upT)"]
       : [ev.md,"ADJUSTED","var(--amb)","var(--ambT)"];
