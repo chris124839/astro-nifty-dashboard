@@ -1000,6 +1000,7 @@ const PAGES=[
   {g:"DATA"},
   {id:"verify",ic:"◷",t:"History Verify",s:"Walk-forward test — predict with past data only, score against what happened"},
   {id:"hist",ic:"☰",t:"Historical Events",s:"Every matched event, searchable"},
+  {id:"eventday",ic:"▥",t:"Event-Day OHLC",s:"Actual OHLC, gap, range and candle name for each matched event"},
   {id:"base",ic:"▤",t:"Market Baseline",s:"What an ordinary session looks like"},
   {id:"data",ic:"⛁",t:"Data Center",s:"Load and manage your raw tables"},
   {id:"settings",ic:"⚙",t:"Settings",s:"Thresholds, holidays and export"}
@@ -1497,6 +1498,98 @@ function pageRange(){
 
 /* ── HISTORICAL EVENTS ── */
 let histQ="";
+/* ── EVENT-DAY OHLC · clones the existing matched-event rules ── */
+function actualCandleSVG(d,w=28,h=42){
+  if(!d||![d.o,d.h,d.l,d.c].every(Number.isFinite)||d.h<=d.l)return '<span class="mono">—</span>';
+  const pad=3, innerH=h-pad*2, y=v=>pad+(d.h-v)/(d.h-d.l)*innerH;
+  const color=d.c>=d.o?'var(--up)':'var(--dn)';
+  const bodyTop=Math.min(y(d.o),y(d.c)), bodyBottom=Math.max(y(d.o),y(d.c));
+  const bodyH=Math.max(2,bodyBottom-bodyTop), bodyW=Math.max(6,w*.42), x=(w-bodyW)/2;
+  return \`<svg width="\${w}" height="\${h}" viewBox="0 0 \${w} \${h}" role="img"
+      aria-label="\${esc(d.candleA||"Candlestick")}" title="\${esc(d.candleA||"Candlestick")}">
+    <line x1="\${w/2}" y1="\${y(d.h)}" x2="\${w/2}" y2="\${y(d.l)}" stroke="\${color}" stroke-width="1.7"/>
+    <rect x="\${x}" y="\${bodyTop}" width="\${bodyW}" height="\${bodyH}" rx="1" fill="\${color}"/>
+  </svg>\`;
+}
+function pageEventDay(){
+  if(!S.daily.length||!S.events.length)return noData();
+  // Reuse the original event filter and dayOf() matching; no new matching rule.
+  const matched=filtered().map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
+  if(!matched.length)return noMatch();
+  const up=matched.filter(x=>x.d.gapPts>0).length;
+  const down=matched.filter(x=>x.d.gapPts<0).length;
+  const green=matched.filter(x=>x.d.c>=x.d.o).length;
+  const red=matched.filter(x=>x.d.c<x.d.o).length;
+  const fmt=v=>Number.isFinite(v)?v.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
+  const signed=v=>Number.isFinite(v)?(v>0?"+":"")+fmt(v):"—";
+  const pct=v=>Number.isFinite(v)?(v>0?"+":"")+v.toFixed(2)+"%":"—";
+  const color=v=>v>0?"var(--up)":v<0?"var(--dn)":"var(--dim)";
+  return scopeBar()+\`
+    <div class="hero" style="grid-template-columns:minmax(0,1fr) repeat(4,minmax(82px,auto))">
+      <div>
+        <div class="lbl">EVENT-DAY MARKET DATA</div>
+        <div class="nm">Matched Events · OHLC Analysis</div>
+        <div class="sm">Actual NIFTY session selected by the existing date-match rule. Candle name is classified from that day's Open, High, Low and Close.</div>
+      </div>
+      <div class="hcell"><div class="k">MATCHED DAYS</div><div class="v mono">\${matched.length}</div></div>
+      <div class="hcell"><div class="k">GAP UP</div><div class="v mono" style="color:var(--up)">\${up}</div></div>
+      <div class="hcell"><div class="k">GAP DOWN</div><div class="v mono" style="color:var(--dn)">\${down}</div></div>
+      <div class="hcell"><div class="k">GREEN / RED</div><div class="v mono"><span style="color:var(--up)">\${green}</span> / <span style="color:var(--dn)">\${red}</span></div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:11px">
+        <div><h3 style="margin:0">EVENT-DAY OHLC TABLE</h3>
+          <div class="sub" style="margin:3px 0 0">Gap = Open − previous close · Range = High − Low · Day move = Close − Open</div></div>
+        <span class="pill">\${matched.length.toLocaleString()} matched sessions</span>
+        <button class="btn ghost" style="margin-left:auto" onclick="exportEventDayCSV()">Export CSV</button>
+      </div>
+      <div class="tw" style="max-height:68vh;overflow-y:auto"><table>
+        <thead><tr>
+          <th>#</th><th>EVENT DATE</th><th>MATCHED NIFTY DATE</th><th>DATE RULE</th>
+          <th>PREV CLOSE (₹)</th><th>OPEN (₹)</th><th>HIGH (₹)</th><th>LOW (₹)</th><th>CLOSE (₹)</th>
+          <th>GAP (POINTS)</th><th>GAP (%)</th><th>RANGE (H−L)</th>
+          <th>DAY MOVE (C−O)</th><th>DAY MOVE (%)</th><th>CANDLE</th><th>CANDLE NAME</th><th>CLOSE POSITION</th>
+        </tr></thead>
+        <tbody>\${matched.slice().reverse().map(({e,d},i)=>{
+          const gp=d.gapPts, dp=d.c-d.o, cp=d.rng>0?(d.c-d.l)/d.rng*100:50;
+          const gapLabel=gp>0?"GAP UP":gp<0?"GAP DOWN":"FLAT";
+          return \`<tr>
+            <td class="mono">\${i+1}</td>
+            <td class="mono">\${dstr(e.date)}</td><td class="mono">\${dstr(e.md)}</td>
+            <td><span class="chp" style="background:\${e.rule==="Same Day"?"var(--upT)":"var(--ambT)"};color:\${e.rule==="Same Day"?"var(--up)":"var(--amb)"}">\${esc(e.rule||"—")}</span></td>
+            <td class="mono">\${fmt(d.pc)}</td><td class="mono">\${fmt(d.o)}</td><td class="mono">\${fmt(d.h)}</td><td class="mono">\${fmt(d.l)}</td>
+            <td class="mono" style="font-weight:700;color:\${color(d.c-d.o)}">\${fmt(d.c)}</td>
+            <td class="mono" style="color:\${color(gp)}" title="\${gapLabel}">\${signed(gp)} <span style="font-size:9px">\${gapLabel}</span></td>
+            <td class="mono" style="color:\${color(d.gap)}">\${pct(d.gap)}</td>
+            <td class="mono">\${fmt(d.h-d.l)}</td>
+            <td class="mono" style="color:\${color(dp)}">\${signed(dp)}</td>
+            <td class="mono" style="color:\${color(d.cvo)}">\${pct(d.cvo)}</td>
+            <td style="text-align:center">\${actualCandleSVG(d,24,40)}</td>
+            <td style="font-weight:600;color:\${color(dp)}">\${esc(d.candleA||"—")}</td>
+            <td class="mono">\${cp.toFixed(1)}% <span style="color:var(--dim2);font-size:9px">of range</span></td>
+          </tr>\`;}).join("")}</tbody>
+      </table></div>
+      <div class="spec" style="margin-top:10px">
+        <b>How to read:</b> Gap Up/Down compares Open with previous trading-day Close. Closed Green/Red compares Close with that day's Open.
+        The candle graphic uses actual OHLC values; candle name is classified using the existing candle-pattern function.
+        Close Position = (Close − Low) ÷ (High − Low) × 100.
+      </div>
+    </div>\`;
+}
+window.exportEventDayCSV=()=>{
+  const rows=filtered().map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
+  const head=["EventDate","MatchedNiftyDate","DateRule","Event","Class","PreviousClose","Open","High","Low","Close",
+    "GapPoints","GapPercent","RangePoints","DayMoveOpenToClosePoints","DayMoveOpenToClosePercent","CandleName","ClosePositionPercent"];
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+  const lines=[head.join(",")];
+  rows.forEach(({e,d})=>{
+    const cp=d.rng>0?(d.c-d.l)/d.rng*100:50;
+    lines.push([iso(e.date),iso(e.md),q(e.rule),q(e.name),q(e.cls),d.pc,d.o,d.h,d.l,d.c,d.gapPts,d.gap,d.h-d.l,d.c-d.o,d.cvo,q(d.candleA),cp].join(","));
+  });
+  const a=document.createElement("a"),url=URL.createObjectURL(new Blob([lines.join("\\n")],{type:"text/csv;charset=utf-8"}));
+  a.href=url;a.download="nifty_event_day_ohlc.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
 function pageHist(){
   if(!S.events.length)return noData();
   const pool=analysisPool();
@@ -2050,6 +2143,7 @@ function render(){
     range:pageRange,
     verify:pageVerify,
     hist:pageHist,
+    eventday:pageEventDay,
     base:pageBase,
     data:pageData,
     settings:pageSettings
