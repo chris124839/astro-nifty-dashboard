@@ -1498,6 +1498,7 @@ function pageRange(){
 
 /* ── HISTORICAL EVENTS ── */
 let histQ="";
+let eventDayRangeMode="5y", eventDayFrom="", eventDayTo="";
 /* ── EVENT-DAY OHLC · clones the existing matched-event rules ── */
 function actualCandleSVG(d,w=28,h=42){
   if(!d||![d.o,d.h,d.l,d.c].every(Number.isFinite)||d.h<=d.l)return '<span class="mono">—</span>';
@@ -1513,8 +1514,21 @@ function actualCandleSVG(d,w=28,h=42){
 }
 function pageEventDay(){
   if(!S.daily.length||!S.events.length)return noData();
-  // Reuse the original event filter and dayOf() matching; no new matching rule.
-  const matched=filtered().map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
+  // This table shows only similar occurrences of the selected event, not every dashboard event.
+  const POOL=analysisPool();
+  const source=similar(POOL.ev).map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
+  const seen=new Set();
+  let matched=source.filter(({e})=>{
+    const id=[e.cls||"",e.name||"",iso(e.date),iso(e.md),e.pair||"",e.aspect||""].join("|");
+    if(seen.has(id))return false; seen.add(id); return true;
+  });
+  const latest=matched.reduce((a,x)=>!a||x.e.md>a?x.e.md:a,null);
+  let from=null,to=null;
+  if(eventDayRangeMode==="5y"&&latest){from=new Date(latest);from.setFullYear(from.getFullYear()-5);to=latest;}
+  else if(eventDayRangeMode==="10y"&&latest){from=new Date(latest);from.setFullYear(from.getFullYear()-10);to=latest;}
+  else if(eventDayRangeMode==="range"){from=eventDayFrom?parseDate(eventDayFrom):null;to=eventDayTo?parseDate(eventDayTo):null;}
+  if(eventDayRangeMode!=="max")matched=matched.filter(x=>(!from||x.e.md>=from)&&(!to||x.e.md<=to));
+  matched.sort((a,b)=>a.e.md-b.e.md||a.e.date-b.e.date);
   if(!matched.length)return noMatch();
   const up=matched.filter(x=>x.d.gapPts>0).length;
   const down=matched.filter(x=>x.d.gapPts<0).length;
@@ -1538,14 +1552,26 @@ function pageEventDay(){
     </div>
     <div class="card">
       <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:11px">
-        <div><h3 style="margin:0">EVENT-DAY OHLC TABLE</h3>
-          <div class="sub" style="margin:3px 0 0">Gap = Open − previous close · Range = High − Low · Day move = Close − Open</div></div>
+        <div><h3 style="margin:0">SIMILAR HISTORICAL EVENTS · OHLC</h3>
+          <div class="sub" style="margin:3px 0 0">Only ${esc(POOL.label)} matches · Gap = Open − previous close · Range = High − Low · Day move = Close − Open</div></div>
         <span class="pill">${matched.length.toLocaleString()} matched sessions</span>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:0 0 12px;padding:10px;background:var(--card2);border:1px solid var(--line);border-radius:8px">
+  <div style="min-width:150px"><label class="k" for="eventDayRangeMode">DATE RANGE · THIS TABLE ONLY</label>
+    <select id="eventDayRangeMode" onchange="setEventDayRangeMode(this.value)" style="display:block;width:100%;margin-top:5px">
+      <option value="5y"${eventDayRangeMode==="5y"?" selected":""}>Last 5 years</option>
+      <option value="10y"${eventDayRangeMode==="10y"?" selected":""}>Last 10 years</option>
+      <option value="max"${eventDayRangeMode==="max"?" selected":""}>Max available data</option>
+      <option value="range"${eventDayRangeMode==="range"?" selected":""}>Specific date range</option>
+    </select>
+  </div>
+  ${eventDayRangeMode==="range"?`<div><label class="k" for="eventDayFrom">FROM</label><input id="eventDayFrom" type="date" value="${esc(eventDayFrom)}" onchange="setEventDayRangeDates()" style="display:block;margin-top:5px"></div><div><label class="k" for="eventDayTo">TO</label><input id="eventDayTo" type="date" value="${esc(eventDayTo)}" onchange="setEventDayRangeDates()" style="display:block;margin-top:5px"></div>`:""}
+  <span class="spec">Only this table is filtered; other dashboard filters remain unchanged.</span>
+</div>
         <button class="btn ghost" style="margin-left:auto" onclick="exportEventDayCSV()">Export CSV</button>
       </div>
       <div class="tw" style="max-height:68vh;overflow-y:auto"><table>
         <thead><tr>
-          <th>#</th><th>EVENT DATE (ADJUSTED)</th>
+          <th>#</th><th>EVENT DATE</th>
           <th>PREV CLOSE (₹)</th><th>OPEN (₹)</th><th>HIGH (₹)</th><th>LOW (₹)</th><th>CLOSE (₹)</th>
           <th>GAP (POINTS)</th><th>GAP (%)</th><th>RANGE (H−L)</th>
           <th>DAY MOVE (C−O)</th><th>DAY MOVE (%)</th><th>CANDLE</th><th>CANDLE NAME</th><th>CLOSE POSITION</th>
@@ -1575,16 +1601,22 @@ function pageEventDay(){
       </div>
     </div>`;
 }
+window.setEventDayRangeMode=mode=>{eventDayRangeMode=["5y","10y","max","range"].includes(mode)?mode:"5y";render();};
+window.setEventDayRangeDates=()=>{eventDayFrom=$("eventDayFrom")?.value||"";eventDayTo=$("eventDayTo")?.value||"";render();};
 window.exportEventDayCSV=()=>{
-  const rows=filtered().map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
-  const head=["EventDateAdjusted","Event","Class","PreviousClose","Open","High","Low","Close",
-    "GapPoints","GapPercent","RangePoints","DayMoveOpenToClosePoints","DayMoveOpenToClosePercent","CandleName","ClosePositionPercent"];
+  const POOL=analysisPool();
+  const source=similar(POOL.ev).map(e=>({e,d:dayOf(e)})).filter(x=>x.d);
+  const seen=new Set();
+  let rows=source.filter(({e})=>{const id=[e.cls||"",e.name||"",iso(e.date),iso(e.md),e.pair||"",e.aspect||""].join("|");if(seen.has(id))return false;seen.add(id);return true;});
+  const latest=rows.reduce((a,x)=>!a||x.e.md>a?x.e.md:a,null);let from=null,to=null;
+  if(eventDayRangeMode==="5y"&&latest){from=new Date(latest);from.setFullYear(from.getFullYear()-5);to=latest;}
+  else if(eventDayRangeMode==="10y"&&latest){from=new Date(latest);from.setFullYear(from.getFullYear()-10);to=latest;}
+  else if(eventDayRangeMode==="range"){from=eventDayFrom?parseDate(eventDayFrom):null;to=eventDayTo?parseDate(eventDayTo):null;}
+  if(eventDayRangeMode!=="max")rows=rows.filter(x=>(!from||x.e.md>=from)&&(!to||x.e.md<=to));
+  const head=["EventDateAdjusted","Event","Class","PreviousClose","Open","High","Low","Close","GapPoints","GapPercent","RangePoints","DayMoveOpenToClosePoints","DayMoveOpenToClosePercent","CandleName","ClosePositionPercent"];
   const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
   const lines=[head.join(",")];
-  rows.forEach(({e,d})=>{
-    const cp=d.rng>0?(d.c-d.l)/d.rng*100:50;
-    lines.push([iso(e.md),q(e.name),q(e.cls),d.pc,d.o,d.h,d.l,d.c,d.gapPts,d.gap,d.h-d.l,d.c-d.o,d.cvo,q(d.candleA),cp].join(","));
-  });
+  rows.forEach(({e,d})=>{const cp=d.rng>0?(d.c-d.l)/d.rng*100:50;lines.push([iso(e.md),q(e.name),q(e.cls),d.pc,d.o,d.h,d.l,d.c,d.gapPts,d.gap,d.h-d.l,d.c-d.o,d.cvo,q(d.candleA),cp].join(","));});
   const a=document.createElement("a"),url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"}));
   a.href=url;a.download="nifty_event_day_ohlc.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
