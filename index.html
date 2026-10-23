@@ -1670,59 +1670,59 @@ function pageGannWave(){
   const py=v=>T+(100-v)/200*ih;
   const path=rows.map((r,i)=>(i?"L":"M")+px(i).toFixed(2)+" "+py(r.wave).toFixed(2)).join(" ");
   const area=path+" L "+px(rows.length-1)+" "+py(0)+" L "+px(0)+" "+py(0)+" Z";
-  return \`
+  return `
     <div class="hero">
       <div><div class="lbl">SEPARATE MODULE · SAME NIFTY OHLC</div><div class="nm">Gann Signal Wave</div>
       <div class="sm">Daily close → square-root degree → sine waveform. Recalculates whenever the dashboard's OHLC dataset is refreshed.</div></div>
-      <div class="hcell"><div class="k">LATEST SESSION</div><div class="v mono">\${dstr(last.d)}</div></div>
-      <div class="hcell"><div class="k">NIFTY CLOSE</div><div class="vb mono">\${fmt(last.c)}</div></div>
-      <div class="hcell"><div class="k">GANN DEGREE</div><div class="vb mono">\${last.degree.toFixed(1)}°</div></div>
-      <div class="hcell"><div class="k">WAVE SIGNAL</div><div class="v" style="color:\${last.signal==="BULLISH"?"var(--up)":last.signal==="BEARISH"?"var(--dn)":"var(--amb)"}">\${last.signal}</div></div>
+      <div class="hcell"><div class="k">LATEST SESSION</div><div class="v mono">${dstr(last.d)}</div></div>
+      <div class="hcell"><div class="k">NIFTY CLOSE</div><div class="vb mono">${fmt(last.c)}</div></div>
+      <div class="hcell"><div class="k">GANN DEGREE</div><div class="vb mono">${last.degree.toFixed(1)}°</div></div>
+      <div class="hcell"><div class="k">WAVE SIGNAL</div><div class="v" style="color:${last.signal==="BULLISH"?"var(--up)":last.signal==="BEARISH"?"var(--dn)":"var(--amb)"}">${last.signal}</div></div>
     </div>
     <div class="card">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
         <div><h3 style="margin:0">SIGNAL WAVEFORM</h3><div class="sub" style="margin-top:4px">Wave amplitude = sin(Gann degree) × 100 · zero-line crossings show phase changes</div></div>
         <select aria-label="Wave history window" onchange="setGannWaveWindow(this.value)" style="margin-left:auto;padding:8px 10px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px">
-          <option value="90"\${gannWaveWindow==="90"?" selected":""}>Last 90 sessions</option>
-          <option value="180"\${gannWaveWindow==="180"?" selected":""}>Last 180 sessions</option>
-          <option value="365"\${gannWaveWindow==="365"?" selected":""}>Last 365 sessions</option>
-          <option value="all"\${gannWaveWindow==="all"?" selected":""}>All available data</option>
+          <option value="90"${gannWaveWindow==="90"?" selected":""}>Last 90 sessions</option>
+          <option value="180"${gannWaveWindow==="180"?" selected":""}>Last 180 sessions</option>
+          <option value="365"${gannWaveWindow==="365"?" selected":""}>Last 365 sessions</option>
+          <option value="all"${gannWaveWindow==="all"?" selected":""}>All available data</option>
         </select>
       </div>
       <div style="width:100%;overflow-x:auto">
-        <svg viewBox="0 0 \${W} \${H}" role="img" aria-label="Gann degree signal waveform" style="width:100%;min-width:620px;display:block">
-          <line x1="\${L}" y1="\${py(0)}" x2="\${W-R}" y2="\${py(0)}" stroke="var(--dim2)" stroke-dasharray="5 5"/>
-          <line x1="\${L}" y1="\${py(50)}" x2="\${W-R}" y2="\${py(50)}" stroke="var(--line)" />
-          <line x1="\${L}" y1="\${py(-50)}" x2="\${W-R}" y2="\${py(-50)}" stroke="var(--line)" />
-          <text x="4" y="\${py(100)+4}" fill="var(--dim)" font-size="11">+100</text>
-          <text x="18" y="\${py(0)+4}" fill="var(--dim)" font-size="11">0</text>
-          <text x="4" y="\${py(-100)+4}" fill="var(--dim)" font-size="11">−100</text>
-          <path d="\${area}" fill="var(--acc)" opacity=".10"/>
-          <path d="\${path}" fill="none" stroke="var(--acc2)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-          \${rows.map((r,i)=>i===rows.length-1?\`<circle cx="\${px(i)}" cy="\${py(r.wave)}" r="4.5" fill="\${r.signal==="BULLISH"?"var(--up)":r.signal==="BEARISH"?"var(--dn)":"var(--amb)"}"><title>\${dstr(r.d)} · \${r.degree.toFixed(1)}° · \${r.signal}</title></circle>\`:"").join("")}
-          <text x="\${L}" y="\${H-6}" fill="var(--dim)" font-size="11">\${dstr(rows[0].d)}</text>
-          <text x="\${W-R}" y="\${H-6}" fill="var(--dim)" font-size="11" text-anchor="end">\${dstr(last.d)}</text>
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gann degree signal waveform" style="width:100%;min-width:620px;display:block">
+          <line x1="${L}" y1="${py(0)}" x2="${W-R}" y2="${py(0)}" stroke="var(--dim2)" stroke-dasharray="5 5"/>
+          <line x1="${L}" y1="${py(50)}" x2="${W-R}" y2="${py(50)}" stroke="var(--line)" />
+          <line x1="${L}" y1="${py(-50)}" x2="${W-R}" y2="${py(-50)}" stroke="var(--line)" />
+          <text x="4" y="${py(100)+4}" fill="var(--dim)" font-size="11">+100</text>
+          <text x="18" y="${py(0)+4}" fill="var(--dim)" font-size="11">0</text>
+          <text x="4" y="${py(-100)+4}" fill="var(--dim)" font-size="11">−100</text>
+          <path d="${area}" fill="var(--acc)" opacity=".10"/>
+          <path d="${path}" fill="none" stroke="var(--acc2)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+          ${rows.map((r,i)=>i===rows.length-1?`<circle cx="${px(i)}" cy="${py(r.wave)}" r="4.5" fill="${r.signal==="BULLISH"?"var(--up)":r.signal==="BEARISH"?"var(--dn)":"var(--amb)"}"><title>${dstr(r.d)} · ${r.degree.toFixed(1)}° · ${r.signal}</title></circle>`:"").join("")}
+          <text x="${L}" y="${H-6}" fill="var(--dim)" font-size="11">${dstr(rows[0].d)}</text>
+          <text x="${W-R}" y="${H-6}" fill="var(--dim)" font-size="11" text-anchor="end">${dstr(last.d)}</text>
         </svg>
       </div>
-      <div class="spec" style="margin-top:8px"><b>Method:</b> degree = ((√Close − √Anchor Close) × 180) mod 360; waveform = sin(degree) × 100. Anchor is the first close in the currently loaded OHLC history (\${fmt(all[0].c)} on \${dstr(all[0].d)}). This is an experimental square-root price-geometry heuristic, not a validated standalone trading signal.</div>
+      <div class="spec" style="margin-top:8px"><b>Method:</b> degree = ((√Close − √Anchor Close) × 180) mod 360; waveform = sin(degree) × 100. Anchor is the first close in the currently loaded OHLC history (${fmt(all[0].c)} on ${dstr(all[0].d)}). This is an experimental square-root price-geometry heuristic, not a validated standalone trading signal.</div>
     </div>
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">DAILY DEGREE & SIGNAL LOG</h3><span class="pill">\${rows.length} sessions</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">DAILY DEGREE & SIGNAL LOG</h3><span class="pill">${rows.length} sessions</span></div>
       <div class="sub" style="margin:5px 0 12px">Newest first · same OHLC rows as the main dashboard</div>
       <div class="tw" style="max-height:62vh;overflow:auto"><table>
         <thead><tr><th>DATE</th><th>PREV CLOSE</th><th>CLOSE</th><th>DAY CHANGE</th><th>GANN DEGREE</th><th>WAVE</th><th>SIGNAL</th></tr></thead>
-        <tbody>\${rows.slice().reverse().map(r=>\`<tr>
-          <td class="mono">\${dstr(r.d)}</td><td class="mono">\${fmt(r.pc)}</td><td class="mono" style="font-weight:700">\${fmt(r.c)}</td>
-          <td class="mono" style="color:\${signColor(r.delta)}">\${r.delta>0?"+":""}\${fmt(r.delta)}</td>
-          <td class="mono">\${r.degree.toFixed(2)}°</td>
-          <td style="min-width:130px"><div style="height:8px;background:var(--card3);border-radius:8px;overflow:hidden"><div style="height:100%;width:\${Math.abs(r.wave)}%;margin-left:\${r.wave<0?100-Math.abs(r.wave):0}%;background:\${r.wave>=0?"var(--up)":"var(--dn)"};border-radius:8px"></div></div><span class="mono" style="font-size:10px;color:\${signColor(r.wave)}">\${r.wave.toFixed(1)}</span></td>
-          <td><span class="chp" style="background:\${r.signal==="BULLISH"?"var(--upT)":r.signal==="BEARISH"?"var(--dnT)":"var(--ambT)"};color:\${r.signal==="BULLISH"?"var(--up)":r.signal==="BEARISH"?"var(--dn)":"var(--amb)"}">\${r.signal}</span></td>
-        </tr>\`).join("")}</tbody>
+        <tbody>${rows.slice().reverse().map(r=>`<tr>
+          <td class="mono">${dstr(r.d)}</td><td class="mono">${fmt(r.pc)}</td><td class="mono" style="font-weight:700">${fmt(r.c)}</td>
+          <td class="mono" style="color:${signColor(r.delta)}">${r.delta>0?"+":""}${fmt(r.delta)}</td>
+          <td class="mono">${r.degree.toFixed(2)}°</td>
+          <td style="min-width:130px"><div style="height:8px;background:var(--card3);border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.abs(r.wave)}%;margin-left:${r.wave<0?100-Math.abs(r.wave):0}%;background:${r.wave>=0?"var(--up)":"var(--dn)"};border-radius:8px"></div></div><span class="mono" style="font-size:10px;color:${signColor(r.wave)}">${r.wave.toFixed(1)}</span></td>
+          <td><span class="chp" style="background:${r.signal==="BULLISH"?"var(--upT)":r.signal==="BEARISH"?"var(--dnT)":"var(--ambT)"};color:${r.signal==="BULLISH"?"var(--up)":r.signal==="BEARISH"?"var(--dn)":"var(--amb)"}">${r.signal}</span></td>
+        </tr>`).join("")}</tbody>
       </table></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--dim)">
         <span><b style="color:var(--up)">BULLISH</b> wave ≥ +15</span><span><b style="color:var(--dn)">BEARISH</b> wave ≤ −15</span><span><b style="color:var(--amb)">NEUTRAL</b> between thresholds</span>
       </div>
-    </div>\`;
+    </div>`;
 }
 window.setGannWaveWindow=v=>{gannWaveWindow=["90","180","365","all"].includes(v)?v:"180";render();};
 
