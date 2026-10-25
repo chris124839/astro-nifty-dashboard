@@ -208,6 +208,24 @@ tbody tr:hover{background:var(--card2)}
 .cpscale .mk{position:absolute;left:50%;width:11px;height:11px;border-radius:50%;background:var(--up);
   border:2px solid var(--card);transform:translate(-50%,50%);transition:bottom .4s}
 
+
+/* Gann spiral grid */
+.gann-controls{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr)) auto;gap:10px;align-items:end;margin:12px 0}
+.gann-controls .fgrp{margin:0;min-width:0}
+.gann-controls input,.gann-controls select{width:100%;min-width:0;background:var(--card2);border:1px solid var(--line);border-radius:7px;padding:8px;font-size:12px}
+.gann-legend{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--dim);font-size:11px;padding:8px 0}
+.gann-grid-wrap{width:100%;overflow:auto;max-height:72vh;border:1px solid var(--line);border-radius:8px;background:var(--bg2)}
+table.gann-grid{width:max-content;min-width:100%;border-collapse:separate;border-spacing:2px;white-space:normal}
+.gann-grid td{padding:0;border:1px solid var(--line);border-radius:4px;text-align:center;min-width:62px;height:47px;background:var(--card2);cursor:pointer;transition:background .12s,border-color .12s}
+.gann-grid td b{display:block;font-size:11px;color:var(--acc2);font-family:"JetBrains Mono",monospace;padding-top:4px}
+.gann-grid td small{display:block;font-size:9px;color:var(--dim);padding:2px 2px 4px;white-space:nowrap}
+.gann-grid td:hover{border-color:var(--acc);background:var(--card3)}
+.gann-grid td.gcenter{background:var(--accT);border-color:var(--acc)}
+.gann-grid td.gselected{outline:2px solid var(--amb);outline-offset:-2px;background:var(--ambT)}
+.gann-grid td.emptycell{background:transparent;border-color:transparent;cursor:default}
+.gann-cell-info{margin-top:10px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px}
+@media(max-width:900px){.gann-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.gann-controls .btn{grid-column:1/-1}.gann-grid td{min-width:54px;height:42px}.gann-grid td small{font-size:8px}}
+
 /* filters rail */
 .fgrp{margin-bottom:10px}
 .fgrp label{display:block;font-size:10px;color:var(--dim2);font-weight:600;margin-bottom:4px}
@@ -1009,6 +1027,8 @@ const PAGES=[
   {id:"time",ic:"◔",t:"Time Analysis",s:"Where in the clock the event lands"},
   {id:"candle",ic:"▮",t:"Candle Analysis",s:"Which candle forms, by group"},
   {id:"range",ic:"◫",t:"Range Analysis",s:"Expected day range and close position"},
+  {g:"GANN TOOLS"},
+  {id:"gann",ic:"◎",t:"Gann Spiral Grids",s:"Excel-style session, 24-hour, weekly, monthly and yearly spiral grids"},
   {g:"DATA"},
   {id:"verify",ic:"◷",t:"History Verify",s:"Walk-forward test — predict with past data only, score against what happened"},
   {id:"hist",ic:"☰",t:"Historical Events",s:"Every matched event, searchable"},
@@ -2168,6 +2188,77 @@ window.resetF=()=>{S.f={planet:"",type:"",pair:"",aspect:"",from:"",to:"",dir:""
 window.jump=i=>{S.curIdx=i;S.page="dash";save();render();
   if(window.innerWidth<=1180)$("rail").classList.remove("open");};
 
+
+/* GANN SPIRAL GRID: visible workbook layout port */
+let gannSelectedCell = 1;
+function gannGridCoords(size){
+  const cells=Array.from({length:size},()=>Array(size).fill(0));
+  let r=Math.floor(size/2),c=Math.floor(size/2),n=1; cells[r][c]=n;
+  const dirs=[[0,-1],[-1,0],[0,1],[1,0]]; let len=1,di=0;
+  while(n<size*size){
+    for(let repeat=0;repeat<2 && n<size*size;repeat++){
+      const dr=dirs[di%4][0],dc=dirs[di%4][1];
+      for(let k=0;k<len && n<size*size;k++){
+        r+=dr;c+=dc;n++; if(r>=0&&r<size&&c>=0&&c<size)cells[r][c]=n;
+      }
+      di++;
+    } len++;
+  } return cells;
+}
+function gannAddMonths(date,months){
+  const d=new Date(date.getTime()),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+months);
+  d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d;
+}
+function gannDateLabel(count,mode,startDate,startTime){
+  const n=count-1;
+  if(mode==="session"||mode==="24h"){
+    const parts=(startTime||"09:15").split(":").map(Number);let mins=parts[0]*60+parts[1]+n*5;
+    if(mode==="session"){const base=9*60+15,slots=76;mins=base+((((Math.round((mins-base)/5)%slots)+slots)%slots)*5);}
+    else mins=((mins%(24*60))+(24*60))%(24*60);
+    return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+  }
+  let d=new Date((startDate||"2025-12-01")+"T12:00:00");if(Number.isNaN(d.getTime()))d=new Date();
+  if(mode==="weekly")d.setDate(d.getDate()+n*7);else if(mode==="monthly")d=gannAddMonths(d,n);else d.setFullYear(d.getFullYear()+n);
+  return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+}
+function gannGridHTML(){
+  const mode=$("gannMode")?$("gannMode").value:"weekly",size=+$("gannSize").value||19;
+  const startDate=$("gannStartDate").value||"2025-12-01",startTime=$("gannStartTime").value||"09:15";
+  const coords=gannGridCoords(size),labels={session:"Intraday session · 5-minute steps","24h":"24-hour clock · 5-minute steps",weekly:"Weekly dates",monthly:"Monthly dates",yearly:"Yearly dates"};
+  const rows=coords.map(row=>"<tr>"+row.map(n=>{
+    if(!n)return '<td class="gcell emptycell"></td>';
+    const label=gannDateLabel(n,mode,startDate,startTime),center=n===1,selected=n===gannSelectedCell;
+    return '<td class="gcell '+(center?"gcenter ":"")+(selected?"gselected":"")+'" onclick="gannPickCell('+n+')" title="Cell '+n+' · '+label+'"><b>'+n+'</b><small>'+label+'</small></td>';
+  }).join("")+"</tr>").join("");
+  return '<div class="card"><h3>GANN SPIRAL WORKBENCH</h3><div class="sub">Excel-style spiral numbering with selectable time/date scale. Choose a cell to inspect its count and projected value.</div>'+
+    '<div class="gann-controls"><div class="fgrp"><label>GRID TYPE</label><select id="gannMode" onchange="gannModeChanged()">'+
+    '<option value="session" '+(mode==="session"?"selected":"")+'>Session · 5 minutes</option><option value="24h" '+(mode==="24h"?"selected":"")+'>24 hours · 5 minutes</option>'+
+    '<option value="weekly" '+(mode==="weekly"?"selected":"")+'>Weekly</option><option value="monthly" '+(mode==="monthly"?"selected":"")+'>Monthly</option><option value="yearly" '+(mode==="yearly"?"selected":"")+'>Yearly</option></select></div>'+
+    '<div class="fgrp"><label>GRID SIZE (ODD)</label><select id="gannSize" onchange="gannSelectedCell=1;renderGannGrid()">'+[9,19,21,39].map(v=>'<option value="'+v+'" '+(size===v?"selected":"")+'>'+v+' × '+v+'</option>').join("")+'</select></div>'+
+    '<div class="fgrp"><label>START DATE</label><input id="gannStartDate" type="date" value="'+esc(startDate)+'" onchange="renderGannGrid()"></div>'+
+    '<div class="fgrp"><label>START TIME</label><input id="gannStartTime" type="time" value="'+esc(startTime)+'" onchange="renderGannGrid()" '+(mode!=="session"&&mode!=="24h"?"disabled":"")+'></div>'+
+    '<button class="btn" onclick="renderGannGrid()">Rebuild grid</button></div>'+
+    '<div class="gann-legend"><span>Selected cell: <b id="gannSelectedLabel">#'+gannSelectedCell+'</b></span><span>'+labels[mode]+'</span><span>Center cell = 1</span></div>'+
+    '<div class="gann-grid-wrap"><table class="gann-grid"><tbody>'+rows+'</tbody></table></div>'+
+    '<div id="gannCellInfo" class="gann-cell-info"><b>Cell '+gannSelectedCell+'</b> · '+gannDateLabel(gannSelectedCell,mode,startDate,startTime)+'</div>'+
+    '<p class="sub" style="margin-top:10px">Method note: follows the workbook’s visible spiral layout (1 at center, 2 to the left, then upward and around). Session and 24-hour labels repeat cyclically; weekly/monthly/yearly labels advance from the selected start date. These are time-grid projections, not market-direction predictions. Holiday adjustments are not applied in this grid yet.</p></div>';
+}
+function gannPickCell(n){gannSelectedCell=n;renderGannGrid();}
+function gannModeChanged(){
+  const mode=$("gannMode").value,sizes={session:21,"24h":39,weekly:19,monthly:19,yearly:19};
+  $("gannSize").value=String(sizes[mode]||19);gannSelectedCell=1;renderGannGrid();
+}
+function renderGannGrid(){
+  const host=$("gannHost");if(!host)return;
+  const mode=$("gannMode").value,size=+$("gannSize").value||19,startDate=$("gannStartDate").value||"2025-12-01",startTime=$("gannStartTime").value||"09:15";
+  host.innerHTML=gannGridHTML();
+  const lab=$("gannSelectedLabel");if(lab)lab.textContent="#"+gannSelectedCell;
+  const info=$("gannCellInfo");if(info)info.innerHTML="<b>Cell "+gannSelectedCell+"</b> · "+gannDateLabel(gannSelectedCell,mode,startDate,startTime)+" · grid "+size+"×"+size;
+}
+function pageGann(){
+  return '<div class="hero" style="grid-template-columns:auto minmax(0,1fr)"><div class="orb">◎</div><div><div class="lbl">GANN TOOLS · EXCEL LOGIC PORT</div><div class="nm">Spiral Time Grids</div><div class="sm">Session, 24-hour, weekly, monthly and yearly grids in the dashboard</div></div></div><div id="gannHost">'+gannGridHTML()+'</div>';
+}
+
 /* ══════════════════════════════════════════════════════════════
    RENDER
    ══════════════════════════════════════════════════════════════ */
@@ -2192,6 +2283,7 @@ function render(){
       "Where in the 24-hour clock the event falls. Transits and aspects may cover different eras — filter by type"),
     candle:pageCandle,
     range:pageRange,
+    gann:pageGann,
     verify:pageVerify,
     hist:pageHist,
     eventday:pageEventDay,
