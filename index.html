@@ -2222,8 +2222,8 @@ function gannDateLabel(count,mode,startDate,startTime){
   return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
 }
 function gannGridHTML(){
-  const mode=$("gannMode")?$("gannMode").value:"weekly",size=+$("gannSize").value||19;
-  const startDate=$("gannStartDate").value||"2025-12-01",startTime=$("gannStartTime").value||"09:15";
+  const mode=$("gannMode")?$("gannMode").value:"weekly",size=+($("gannSize")&&$("gannSize").value)||19;
+  const startDate=($("gannStartDate")&&$("gannStartDate").value)||"2025-12-01",startTime=($("gannStartTime")&&$("gannStartTime").value)||"09:15";
   const coords=gannGridCoords(size),labels={session:"Intraday session · 5-minute steps","24h":"24-hour clock · 5-minute steps",weekly:"Weekly dates",monthly:"Monthly dates",yearly:"Yearly dates"};
   const rows=coords.map(row=>"<tr>"+row.map(n=>{
     if(!n)return '<td class="gcell emptycell"></td>';
